@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Environment
+.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# AI Model weights (download separately)
+*.pt
+
+# Database
+*.db
+
+# Uploads (user data)
+backend/uploads/
+
+# Generated outputs
+backend/output_annotated.mp4
+
+# Node.js (frontend)
+node_modules/
+.next/
