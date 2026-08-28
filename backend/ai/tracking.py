@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 class Track:
     """Represents a single tracked object"""
     
-    def __init__(self, track_id: int, bbox: List[float], frame_number: int):
+    def __init__(self, track_id: int, bbox: List[float], confidence: float, frame_number: int):
         self.track_id = track_id
         self.bbox = bbox  # [x1, y1, x2, y2]
+        self.confidence = confidence
         self.frame_number = frame_number
         self.trajectory = [bbox]  # History of positions
         self.age = 0  # Number of frames since creation
@@ -23,9 +24,10 @@ class Track:
         self.misses = 0  # Number of missed detections
         self.state = "active"  # active, lost, deleted
     
-    def update(self, bbox: List[float], frame_number: int):
+    def update(self, bbox: List[float], confidence: float, frame_number: int):
         """Update track with new detection"""
         self.bbox = bbox
+        self.confidence = confidence
         self.trajectory.append(bbox)
         self.frame_number = frame_number
         self.age += 1
@@ -36,7 +38,7 @@ class Track:
         """Mark track as missed in current frame"""
         self.age += 1
         self.misses += 1
-        if self.misses > 5:  # Max consecutive misses before deletion
+        if self.misses > 30:  # Allow 30 frames (1 second) of occlusion before deleting identity
             self.state = "deleted"
         else:
             self.state = "lost"
@@ -139,14 +141,23 @@ class SimpleTracker:
             best_det_idx = max(range(len(row)), key=lambda i: row[i])
             if row[best_det_idx] >= self.iou_threshold and best_det_idx not in matched_detections:
                 # Match found
-                self.tracks[track_id].update(detections[best_det_idx]["bbox"], frame_number)
+                self.tracks[track_id].update(
+                    detections[best_det_idx]["bbox"], 
+                    detections[best_det_idx].get("confidence", 1.0),
+                    frame_number
+                )
                 matched_detections.add(best_det_idx)
                 matched_tracks.add(track_id)
         
         # Create new tracks for unmatched detections
         for det_idx, detection in enumerate(detections):
             if det_idx not in matched_detections:
-                new_track = Track(self.next_track_id, detection["bbox"], frame_number)
+                new_track = Track(
+                    self.next_track_id, 
+                    detection["bbox"], 
+                    detection.get("confidence", 1.0),
+                    frame_number
+                )
                 self.tracks[self.next_track_id] = new_track
                 self.next_track_id += 1
         
@@ -159,10 +170,13 @@ class SimpleTracker:
         # Return active tracks
         active_tracks = []
         for track in self.tracks.values():
+            # Validate track to avoid false positives:
+            # Must have been seen multiple times, or is brand new but high confidence
             if track.state == "active":
                 track_dict = {
                     "track_id": track.track_id,
                     "bbox": track.bbox,
+                    "confidence": track.confidence,
                     "age": track.age,
                     "center": track.get_center(),
                     "velocity": track.get_velocity()

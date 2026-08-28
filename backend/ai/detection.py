@@ -76,6 +76,7 @@ class PersonDetector:
                 frame,
                 conf=self.confidence_threshold,
                 iou=self.iou_threshold,
+                imgsz=1280,  # High resolution for detecting tiny people in crowds
                 verbose=False,
                 classes=[self.PERSON_CLASS_ID]  # Only detect persons
             )
