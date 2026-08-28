@@ -11,6 +11,7 @@ import logging
 from api.videos import router as videos_router
 from api.analysis import router as analysis_router
 from ai.detection import PersonDetector
+from database import init_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,6 +21,16 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events"""
     logger.info("Starting CrowdSentinel AI Backend")
+
+    # Initialize database
+    try:
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        raise
+
+    # Initialize YOLO model on startup
     
     # Initialize YOLO model on startup
     try:

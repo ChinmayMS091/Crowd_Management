@@ -99,10 +99,22 @@ async def process_video_task(analysis_id: int, video_path: str, db: AsyncSession
         flow_rates = []
         previous_risk_score = None
         
+        async def progress_callback(
+            analysis_id: int,
+            progress: float
+        ):
+            await update_analysis_progress(
+                analysis_id,
+                progress,
+                db
+            )
+
+
         async for frame_result in processor.process_video(
             video_path,
             analysis_id,
-            frame_skip=settings.frame_extraction_fps
+            progress_callback=progress_callback,
+            detection_interval=5
         ):
             # Store metrics
             metric = AnalysisMetric(

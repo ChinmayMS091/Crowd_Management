@@ -29,15 +29,18 @@ class VideoProcessor:
         """Initialize all processing components"""
         self.detector = PersonDetector()
         self.tracker = SimpleTracker()
-        self.analytics = None  # Will be initialized when video dimensions are known
+        self.analytics = None
         self.risk_engine = RiskEngine()
+
+        # Stores confirmed person IDs seen throughout the video
+        self.unique_track_ids = set()
     
     async def process_video(
         self,
         video_path: str,
         analysis_id: int,
         progress_callback: Optional[callable] = None,
-        frame_skip: int = 1
+        detection_interval: int = 5
     ) -> AsyncGenerator[Dict, None]:
         """
         Process video frame by frame and yield results
@@ -46,7 +49,7 @@ class VideoProcessor:
             video_path: Path to video file
             analysis_id: Database ID for this analysis
             progress_callback: Optional callback for progress updates
-            frame_skip: Process every Nth frame (1 = all frames)
+            detection_interval: Run YOLO every Nth frame
             
         Yields:
             Dict with frame results and metrics
@@ -71,13 +74,12 @@ class VideoProcessor:
             
             # Reset tracker
             self.tracker.reset()
+            self.unique_track_ids.clear()
             
-            # Calculate actual frame skip based on desired FPS
-            # If frame_skip parameter is 1, it means 1 frame per second.
-            # So we skip int(fps) frames.
-            actual_frame_skip = max(1, int(fps / frame_skip)) if frame_skip > 0 else 1
-            logger.info(f"Processing {frame_skip} frames per second (skipping every {actual_frame_skip} frames)")
-            
+            # Process every frame by default.
+            # detection_interval=5 means YOLO runs every 5th frame.
+            # Frames between detections are handled by the tracker.
+                        
             frame_number = 0
             processed_count = 0
             
@@ -86,15 +88,15 @@ class VideoProcessor:
                 
                 if not ret:
                     break
-                
-                # Skip frames if configured
-                if frame_number % actual_frame_skip != 0:
-                    frame_number += 1
-                    continue
-                
+                               
                 # Process frame
                 result = await self._process_frame(
-                    frame, frame_number, fps, width, height
+                    frame,
+                    frame_number,
+                    fps,
+                    width,
+                    height,
+                    detection_interval
                 )
                 
                 processed_count += 1
@@ -108,7 +110,7 @@ class VideoProcessor:
                 
                 frame_number += 1
             
-            unique_people = self.tracker.next_track_id - 1
+            unique_people = len(self.unique_track_ids)
             logger.info(f"Processing complete: {processed_count} frames processed.")
             logger.info(f"VIDEO ANALYSIS REPORT -> Unique People Observed: {unique_people}")
             
@@ -121,7 +123,8 @@ class VideoProcessor:
         frame_number: int,
         fps: float,
         width: int,
-        height: int
+        height: int,
+        detection_interval: int = 5
     ) -> Dict:
         """
         Process a single frame through the pipeline
@@ -139,28 +142,49 @@ class VideoProcessor:
         timestamp = frame_number / fps
         
         # Step 1: Detection
-        detections = self.detector.detect_frame(frame, frame_number)
-        
+        run_detection = (
+            frame_number % detection_interval == 0
+        )
+
+        if run_detection:
+            detections = self.detector.detect_frame(
+                frame,
+                frame_number
+            )
+        else:
+            detections = []
+
         # Step 2: Tracking
-        tracks = self.tracker.update(detections, frame_number)
-        
+        tracks = self.tracker.update(
+            detections,
+            frame_number,
+            detections_available=run_detection
+        ) 
+
         # Step 3: Counting
         people_count = len(tracks)
-        
-        # Step 4: Density
+
+        # Step 4: Record unique people
+        for track in tracks:
+            self.unique_track_ids.add(track["track_id"])
+
+        # Step 5: Density
         density = self.analytics.calculate_density(tracks)
-        
-        # Step 5: Flow metrics
+
+        # Step 6: Flow metrics
         flow_metrics = self.analytics.calculate_flow_metrics(tracks)
-        
-        # Step 6: Bottleneck detection
+
+        # Step 7: Bottleneck detection
         is_bottleneck, bottleneck_reason = self.analytics.detect_bottleneck(
             density, flow_metrics
         )
-        
-        # Step 7: Risk calculation
+
+        # Step 8: Risk calculation
         risk_result = self.risk_engine.calculate_risk(
-            density, flow_metrics, is_bottleneck, people_count=people_count
+            density,
+            flow_metrics,
+            is_bottleneck,
+            people_count=people_count
         )
         
         return {

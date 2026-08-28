@@ -10,16 +10,16 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Database
-    database_url: str = "postgresql+asyncpg://user:password@localhost:5432/crowdsentinel"
-    database_url_sync: str = "postgresql://user:password@localhost:5432/crowdsentinel"
+    database_url: str = "postgresql+asyncpg://crowdflow:crowdflow123@localhost:5432/crowdflow_db"
+    database_url_sync: str = "postgresql://crowdflow:crowdflow123@localhost:5432/crowdflow_db"
     
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     
     # AI Model Configuration
     yolo_model_path: str = "models/yolov8m.pt"
-    yolo_confidence_threshold: float = 0.05
-    yolo_iou_threshold: float = 0.85
+    yolo_confidence_threshold: float = 0.15
+    yolo_iou_threshold: float = 0.50
     
     # Video Processing
     max_video_size_mb: int = 500

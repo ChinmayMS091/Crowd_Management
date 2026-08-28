@@ -2,9 +2,14 @@
 Database connection and session management
 """
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncSession,
+    async_sessionmaker
+)
 from sqlalchemy.orm import declarative_base
 from config import settings
+
 
 # Create async engine
 engine = create_async_engine(
@@ -15,6 +20,7 @@ engine = create_async_engine(
     max_overflow=20
 )
 
+
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -23,6 +29,7 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
     autoflush=False
 )
+
 
 # Base class for models
 Base = declarative_base()
@@ -37,3 +44,21 @@ async def get_db() -> AsyncSession:
             yield session
         finally:
             await session.close()
+
+
+async def init_db():
+    """
+    Create all database tables if they don't already exist.
+    """
+
+    # Import models so SQLAlchemy knows about them
+    from models import (
+        Video,
+        Analysis,
+        Zone,
+        Alert,
+        AnalysisMetric
+    )
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)

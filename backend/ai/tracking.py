@@ -1,196 +1,373 @@
 """
 Person Tracking Module
-Uses ByteTrack for multi-object tracking
+Lightweight tracker for CCTV crowd monitoring.
+
+YOLO runs periodically.
+Between YOLO detections, existing tracks are predicted using velocity.
 """
 
-import numpy as np
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class Track:
-    """Represents a single tracked object"""
-    
-    def __init__(self, track_id: int, bbox: List[float], confidence: float, frame_number: int):
-        self.track_id = track_id
-        self.bbox = bbox  # [x1, y1, x2, y2]
-        self.confidence = confidence
-        self.frame_number = frame_number
-        self.trajectory = [bbox]  # History of positions
-        self.age = 0  # Number of frames since creation
-        self.hits = 1  # Number of successful detections
-        self.misses = 0  # Number of missed detections
-        self.state = "active"  # active, lost, deleted
-    
-    def update(self, bbox: List[float], confidence: float, frame_number: int):
-        """Update track with new detection"""
-        self.bbox = bbox
-        self.confidence = confidence
-        self.trajectory.append(bbox)
-        self.frame_number = frame_number
-        self.age += 1
-        self.hits += 1
-        self.state = "active"
-    
-    def mark_missed(self):
-        """Mark track as missed in current frame"""
-        self.age += 1
-        self.misses += 1
-        if self.misses > 30:  # Allow 30 frames (1 second) of occlusion before deleting identity
-            self.state = "deleted"
-        else:
-            self.state = "lost"
-    
-    def get_center(self) -> Tuple[float, float]:
-        """Get center point of current bbox"""
-        x1, y1, x2, y2 = self.bbox
-        return ((x1 + x2) / 2, (y1 + y2) / 2)
-    
-    def get_velocity(self) -> Tuple[float, float]:
-        """Calculate velocity based on last two positions"""
-        if len(self.trajectory) < 2:
-            return (0.0, 0.0)
-        
-        prev_center = ((self.trajectory[-2][0] + self.trajectory[-2][2]) / 2,
-                       (self.trajectory[-2][1] + self.trajectory[-2][3]) / 2)
-        curr_center = self.get_center()
-        
-        return (curr_center[0] - prev_center[0], curr_center[1] - prev_center[1])
-
-
 class SimpleTracker:
     """
-    Simple IoU-based tracker for person tracking
-    Note: For production, consider using ByteTrack or DeepSORT
+    Lightweight multi-person tracker.
+
+    Features:
+    - Persistent person IDs
+    - YOLO detection every N frames
+    - Prediction between YOLO frames
+    - Confirmation before a track becomes active
+    - Removes stale tracks
+    - Helps prevent ghost tracks
     """
-    
-    def __init__(self, iou_threshold: float = 0.3):
-        """
-        Initialize tracker
-        
-        Args:
-            iou_threshold: IoU threshold for matching detections to tracks
-        """
+
+    def __init__(
+        self,
+        iou_threshold: float = 0.25,
+        max_age: int = 5,
+        min_hits: int = 2
+    ):
         self.iou_threshold = iou_threshold
-        self.tracks: Dict[int, Track] = {}
+        self.max_age = max_age
+        self.min_hits = min_hits
+
+        # Active tracks
+        self.tracks: Dict[int, dict] = {}
+
+        # Next unique ID
         self.next_track_id = 1
-        self.max_age = 30  # Max frames to keep lost tracks
-    
-    def _calculate_iou(self, bbox1: List[float], bbox2: List[float]) -> float:
-        """Calculate Intersection over Union (IoU) between two bounding boxes"""
-        x1 = max(bbox1[0], bbox2[0])
-        y1 = max(bbox1[1], bbox2[1])
-        x2 = min(bbox1[2], bbox2[2])
-        y2 = min(bbox1[3], bbox2[3])
-        
-        if x2 <= x1 or y2 <= y1:
-            return 0.0
-        
-        intersection = (x2 - x1) * (y2 - y1)
-        area1 = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
-        area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
-        union = area1 + area2 - intersection
-        
-        return intersection / union if union > 0 else 0.0
-    
+
+    # =========================================================
+    # MAIN UPDATE
+    # =========================================================
+
     def update(
         self,
         detections: List[dict],
-        frame_number: int
+        frame_number: int,
+        detections_available: bool = True
     ) -> List[dict]:
-        """
-        Update tracks with new detections
-        
-        Args:
-            detections: List of detection dicts with 'bbox' field
-            frame_number: Current frame number
-            
-        Returns:
-            List of track dicts with track_id, bbox, etc.
-        """
-        # Mark all active tracks as missed initially
-        for track in self.tracks.values():
-            if track.state == "active":
-                track.mark_missed()
-        
-        # Match detections to existing tracks
-        matched_detections = set()
-        matched_tracks = set()
-        
-        # Calculate IoU matrix
-        iou_matrix = []
-        for track_id, track in self.tracks.items():
-            if track.state == "deleted":
-                continue
-            row = []
-            for det_idx, detection in enumerate(detections):
-                iou = self._calculate_iou(track.bbox, detection["bbox"])
-                row.append(iou)
-            iou_matrix.append((track_id, row))
-        
-        # Greedy matching
-        for track_id, row in sorted(iou_matrix, key=lambda x: max(x[1]) if x[1] else 0, reverse=True):
-            if track_id in matched_tracks:
-                continue
-            
-            if not row:  # Skip if no detections
-                continue
-            
-            best_det_idx = max(range(len(row)), key=lambda i: row[i])
-            if row[best_det_idx] >= self.iou_threshold and best_det_idx not in matched_detections:
-                # Match found
-                self.tracks[track_id].update(
-                    detections[best_det_idx]["bbox"], 
-                    detections[best_det_idx].get("confidence", 1.0),
-                    frame_number
+
+        # -----------------------------------------------------
+        # Frames where YOLO is NOT executed
+        # -----------------------------------------------------
+
+        if not detections_available:
+
+            active_tracks = []
+
+            for track_id in list(self.tracks.keys()):
+
+                track = self.tracks[track_id]
+
+                track["frames_since_detection"] += 1
+
+                # Delete stale tracks
+                if (
+                    track["frames_since_detection"]
+                    > self.max_age
+                ):
+                    del self.tracks[track_id]
+                    continue
+
+                # Predict next position
+                x1, y1, x2, y2 = track["bbox"]
+
+                vx, vy = track["velocity"]
+
+                predicted_bbox = [
+                    x1 + vx,
+                    y1 + vy,
+                    x2 + vx,
+                    y2 + vy
+                ]
+
+                track["bbox"] = predicted_bbox
+
+                track["center"] = self._get_center(
+                    predicted_bbox
                 )
-                matched_detections.add(best_det_idx)
-                matched_tracks.add(track_id)
-        
-        # Create new tracks for unmatched detections
-        for det_idx, detection in enumerate(detections):
-            if det_idx not in matched_detections:
-                new_track = Track(
-                    self.next_track_id, 
-                    detection["bbox"], 
-                    detection.get("confidence", 1.0),
-                    frame_number
-                )
-                self.tracks[self.next_track_id] = new_track
-                self.next_track_id += 1
-        
-        # Remove old tracks
-        self.tracks = {
-            tid: track for tid, track in self.tracks.items()
-            if track.state != "deleted" and track.age <= self.max_age
-        }
-        
-        # Return active tracks
+
+                track["frame_number"] = frame_number
+
+                # Only return confirmed tracks
+                if track["hits"] >= self.min_hits:
+                    active_tracks.append(track.copy())
+
+            return active_tracks
+
+        # -----------------------------------------------------
+        # YOLO detection frame
+        # -----------------------------------------------------
+
+        matched_track_ids = set()
         active_tracks = []
-        for track in self.tracks.values():
-            # Validate track to avoid false positives:
-            # Must have been seen multiple times, or is brand new but high confidence
-            if track.state == "active":
-                track_dict = {
-                    "track_id": track.track_id,
-                    "bbox": track.bbox,
-                    "confidence": track.confidence,
-                    "age": track.age,
-                    "center": track.get_center(),
-                    "velocity": track.get_velocity()
+
+        # -----------------------------------------------------
+        # Match detections to existing tracks
+        # -----------------------------------------------------
+
+        for detection in detections:
+
+            bbox = detection["bbox"]
+
+            confidence = detection.get(
+                "confidence",
+                1.0
+            )
+
+            best_track_id = None
+            best_iou = 0.0
+
+            for track_id, track in self.tracks.items():
+
+                if track_id in matched_track_ids:
+                    continue
+
+                iou = self._calculate_iou(
+                    bbox,
+                    track["bbox"]
+                )
+
+                if (
+                    iou >= self.iou_threshold
+                    and iou > best_iou
+                ):
+                    best_iou = iou
+                    best_track_id = track_id
+
+            # -------------------------------------------------
+            # Existing track matched
+            # -------------------------------------------------
+
+            if best_track_id is not None:
+
+                track = self.tracks[best_track_id]
+
+                old_center = track["center"]
+
+                new_center = self._get_center(
+                    bbox
+                )
+
+                # Calculate velocity
+                velocity = (
+                    new_center[0] - old_center[0],
+                    new_center[1] - old_center[1]
+                )
+
+                track["bbox"] = bbox
+                track["confidence"] = confidence
+                track["center"] = new_center
+                track["velocity"] = velocity
+
+                track["frame_number"] = frame_number
+
+                track["frames_since_detection"] = 0
+
+                track["hits"] += 1
+
+                track["age"] += 1
+
+                matched_track_ids.add(
+                    best_track_id
+                )
+
+                # Only confirmed tracks are returned
+                if track["hits"] >= self.min_hits:
+                    active_tracks.append(
+                        track.copy()
+                    )
+
+            # -------------------------------------------------
+            # New track
+            # -------------------------------------------------
+
+            else:
+
+                track_id = self.next_track_id
+
+                self.next_track_id += 1
+
+                center = self._get_center(
+                    bbox
+                )
+
+                track = {
+                    "track_id": track_id,
+
+                    "bbox": bbox,
+
+                    "confidence": confidence,
+
+                    "center": center,
+
+                    "velocity": (
+                        0.0,
+                        0.0
+                    ),
+
+                    "age": 1,
+
+                    "hits": 1,
+
+                    "frames_since_detection": 0,
+
+                    "frame_number": frame_number
                 }
-                active_tracks.append(track_dict)
-        
-        logger.debug(f"Frame {frame_number}: {len(active_tracks)} active tracks")
+
+                self.tracks[track_id] = track
+
+                matched_track_ids.add(
+                    track_id
+                )
+
+                # Do NOT immediately count a
+                # brand-new detection as a
+                # confirmed person.
+                #
+                # It must be detected again.
+                if self.min_hits <= 1:
+                    active_tracks.append(
+                        track.copy()
+                    )
+
+        # -----------------------------------------------------
+        # Handle unmatched existing tracks
+        # -----------------------------------------------------
+
+        for track_id in list(self.tracks.keys()):
+
+            if track_id in matched_track_ids:
+                continue
+
+            track = self.tracks[track_id]
+
+            track["frames_since_detection"] += 1
+
+            # Delete stale track
+            if (
+                track["frames_since_detection"]
+                > self.max_age
+            ):
+                del self.tracks[track_id]
+
         return active_tracks
-    
-    def get_track_count(self) -> int:
-        """Get number of active tracks"""
-        return len([t for t in self.tracks.values() if t.state == "active"])
-    
+
+    # =========================================================
+    # CENTER
+    # =========================================================
+
+    def _get_center(
+        self,
+        bbox: List[float]
+    ) -> Tuple[float, float]:
+
+        x1, y1, x2, y2 = bbox
+
+        return (
+            (x1 + x2) / 2,
+            (y1 + y2) / 2
+        )
+
+    # =========================================================
+    # IOU
+    # =========================================================
+
+    def _calculate_iou(
+        self,
+        box1: List[float],
+        box2: List[float]
+    ) -> float:
+
+        x1 = max(
+            box1[0],
+            box2[0]
+        )
+
+        y1 = max(
+            box1[1],
+            box2[1]
+        )
+
+        x2 = min(
+            box1[2],
+            box2[2]
+        )
+
+        y2 = min(
+            box1[3],
+            box2[3]
+        )
+
+        intersection_width = max(
+            0.0,
+            x2 - x1
+        )
+
+        intersection_height = max(
+            0.0,
+            y2 - y1
+        )
+
+        intersection = (
+            intersection_width
+            * intersection_height
+        )
+
+        area1 = (
+            max(
+                0.0,
+                box1[2] - box1[0]
+            )
+            *
+            max(
+                0.0,
+                box1[3] - box1[1]
+            )
+        )
+
+        area2 = (
+            max(
+                0.0,
+                box2[2] - box2[0]
+            )
+            *
+            max(
+                0.0,
+                box2[3] - box2[1]
+            )
+        )
+
+        union = (
+            area1
+            + area2
+            - intersection
+        )
+
+        if union <= 0:
+            return 0.0
+
+        return intersection / union
+
+    # =========================================================
+    # RESET
+    # =========================================================
+
     def reset(self):
-        """Reset all tracks"""
+
         self.tracks.clear()
+
         self.next_track_id = 1
+
+    # =========================================================
+    # ACTIVE TRACK COUNT
+    # =========================================================
+
+    def get_track_count(self) -> int:
+
+        return len(self.tracks)
