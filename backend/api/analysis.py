@@ -183,9 +183,28 @@ async def process_video_task(analysis_id: int, video_path: str, db: AsyncSession
         
         # Calculate aggregates
         analysis.frames_processed = analysis.total_frames
-        analysis.avg_people_count = sum(people_counts) / len(people_counts) if people_counts else 0
-        analysis.max_people_count = max(people_counts) if people_counts else 0
-        analysis.avg_density = sum(densities) / len(densities) if densities else 0
+
+        analysis.avg_people_count = (
+            sum(people_counts) / len(people_counts)
+            if people_counts else 0
+        )
+
+        analysis.max_people_count = (
+            max(people_counts)
+            if people_counts else 0
+        )
+
+        
+        # Diagnostic: total track IDs generated during the video.
+        # This is NOT the actual number of unique people.
+        analysis.unique_people_count = len(
+            processor.unique_track_ids
+        )
+
+        analysis.avg_density = (
+            sum(densities) / len(densities)
+            if densities else 0
+        )
         analysis.max_density = max(densities) if densities else 0
         analysis.avg_flow_rate = sum(flow_rates) / len(flow_rates) if flow_rates else 0
         analysis.max_risk_score = max_risk_score

@@ -48,7 +48,7 @@ export default function Home() {
     try {
       // Upload with progress tracking
       const xhr = new XMLHttpRequest();
-      
+
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           const percentComplete = (e.loaded / e.total) * 100;
@@ -63,7 +63,7 @@ export default function Home() {
           setUploadStatus('processing');
           setUploadMessage('Starting analysis...');
           setUploadProgress(100);
-          
+
           // Start analysis
           try {
             const analysisResponse = await fetch('http://localhost:8000/api/analysis/start', {
@@ -77,7 +77,7 @@ export default function Home() {
             if (analysisResponse.ok) {
               const analysisData = await analysisResponse.json();
               setAnalysisId(analysisData.id);
-              
+
               // Poll for processing progress
               pollAnalysisProgress(analysisData.id);
             } else {
@@ -121,13 +121,13 @@ export default function Home() {
         const response = await fetch(`http://localhost:8000/api/analysis/${id}`);
         if (response.ok) {
           const data = await response.json();
-          
+
           if (data.total_frames && data.frames_processed) {
             const progress = (data.frames_processed / data.total_frames) * 100;
             setProcessingProgress(progress);
             setUploadMessage(`Processing... ${progress.toFixed(0)}%`);
           }
-          
+
           if (data.status === 'completed') {
             clearInterval(pollInterval);
             setUploadStatus('success');
@@ -182,7 +182,7 @@ export default function Home() {
         {/* Header */}
         <header className="mb-12 text-center">
           <h1 className="text-5xl font-bold text-white mb-4">
-            CrowdSentinel AI
+            CrowdManagement AI
           </h1>
           <p className="text-xl text-slate-300">
             AI-powered early crowd-risk monitoring and decision-support system
@@ -196,7 +196,7 @@ export default function Home() {
             <h2 className="text-2xl font-semibold text-white mb-6">
               Upload Video for Analysis
             </h2>
-            
+
             <div className="space-y-4">
               <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center hover:border-slate-500 transition-colors">
                 <input
@@ -292,7 +292,7 @@ export default function Home() {
             <h2 className="text-2xl font-semibold text-white mb-6">
               System Status
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <div className="text-slate-400 text-sm mb-1">Backend API</div>
@@ -318,7 +318,7 @@ export default function Home() {
             <h2 className="text-2xl font-semibold text-white mb-6">
               Processing Pipeline
             </h2>
-            
+
             <div className="flex flex-wrap gap-2">
               {[
                 'Video Upload',

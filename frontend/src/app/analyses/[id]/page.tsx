@@ -26,6 +26,7 @@ interface Analysis {
   frames_processed: number;
   avg_people_count: number | null;
   max_people_count: number | null;
+  unique_people_count: number | null;
   avg_density: number | null;
   max_density: number | null;
   avg_flow_rate: number | null;
@@ -222,9 +223,11 @@ export default function AnalysisDetailPage({ params }: { params: Promise<{ id: s
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
             <div className="text-slate-400 text-sm mb-1">People</div>
+
             <div className="text-3xl font-bold text-white">
               {analysis.max_people_count ?? '-'}
             </div>
+
             <div className="text-slate-500 text-sm mt-1">
               Avg: {analysis.avg_people_count?.toFixed(1) ?? '-'}
             </div>

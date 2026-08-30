@@ -34,10 +34,11 @@ class Video(Base):
 class Analysis(Base):
     """Analysis session for a video"""
     __tablename__ = "analyses"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     video_id = Column(Integer, ForeignKey("videos.id"), nullable=False)
-    status = Column(String, default="pending")  # pending, running, completed, failed
+    status = Column(String, default="pending")
+    unique_people_count = Column(Integer, default=0)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
     total_frames = Column(Integer, nullable=True)

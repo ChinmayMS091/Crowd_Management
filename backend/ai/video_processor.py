@@ -110,9 +110,13 @@ class VideoProcessor:
                 
                 frame_number += 1
             
-            unique_people = len(self.unique_track_ids)
-            logger.info(f"Processing complete: {processed_count} frames processed.")
-            logger.info(f"VIDEO ANALYSIS REPORT -> Unique People Observed: {unique_people}")
+            total_track_ids = len(self.unique_track_ids)
+            logger.info(
+                f"Processing complete: {processed_count} frames processed."
+            )
+            logger.info(
+                f"VIDEO ANALYSIS REPORT -> Total Track IDs Created: {total_track_ids}"
+            )
             
         finally:
             cap.release()

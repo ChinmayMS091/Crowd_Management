@@ -55,6 +55,7 @@ class AnalysisResponse(BaseModel):
     frames_processed: int
     avg_people_count: Optional[float]
     max_people_count: Optional[int]
+    unique_people_count: Optional[int]
     avg_density: Optional[float]
     max_density: Optional[float]
     avg_flow_rate: Optional[float]
