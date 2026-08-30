@@ -2,36 +2,113 @@
 Analysis API routes
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Depends,
+    BackgroundTasks
+)
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+
 from typing import List, Optional
-import asyncio
+
+import logging
+import os
 
 from database import get_db
-from models import Video, Analysis, AnalysisMetric, Alert, Zone
-from schemas import AnalysisCreate, AnalysisResponse, ZoneCreate, ZoneResponse, AlertResponse, AnalysisMetricResponse
+from models import (
+    Video,
+    Analysis,
+    AnalysisMetric,
+    Alert,
+    Zone
+)
+
+from schemas import (
+    AnalysisCreate,
+    AnalysisResponse,
+    ZoneCreate,
+    ZoneResponse,
+    AlertResponse,
+    AnalysisMetricResponse
+)
+
 from ai.video_processor import VideoProcessor
 from ai.risk_engine import RiskEngine
 from config import settings
 
-router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
-# Global processor instance (in production, use a pool)
+# =============================================================
+# LOGGER
+# =============================================================
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================
+# ROUTER
+# =============================================================
+
+router = APIRouter(
+    prefix="/api/analysis",
+    tags=["analysis"]
+)
+
+
+# =============================================================
+# GLOBAL PROCESSORS
+# =============================================================
+
+# Global processor instance
+# In production, use a worker/pool.
 processor = VideoProcessor()
+
 risk_engine = RiskEngine()
 
 
-async def update_analysis_progress(analysis_id: int, progress: float, db: AsyncSession):
+# =============================================================
+# UPDATE ANALYSIS PROGRESS
+# =============================================================
+
+async def update_analysis_progress(
+    analysis_id: int,
+    progress: float,
+    db: AsyncSession
+):
     """Update analysis progress in database"""
-    result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+
+    result = await db.execute(
+        select(Analysis).where(
+            Analysis.id == analysis_id
+        )
+    )
+
     analysis = result.scalar_one_or_none()
+
     if analysis:
-        analysis.frames_processed = int((progress / 100) * analysis.total_frames) if analysis.total_frames else 0
+
+        analysis.frames_processed = (
+            int(
+                (progress / 100)
+                * analysis.total_frames
+            )
+            if analysis.total_frames
+            else 0
+        )
+
         await db.commit()
 
 
-@router.post("/start", response_model=AnalysisResponse)
+# =============================================================
+# START ANALYSIS
+# =============================================================
+
+@router.post(
+    "/start",
+    response_model=AnalysisResponse
+)
 async def start_analysis(
     request: AnalysisCreate,
     background_tasks: BackgroundTasks,
@@ -40,75 +117,150 @@ async def start_analysis(
     """
     Start analysis for a video
     """
+
+    # ---------------------------------------------------------
     # Verify video exists
-    result = await db.execute(select(Video).where(Video.id == request.video_id))
+    # ---------------------------------------------------------
+
+    result = await db.execute(
+        select(Video).where(
+            Video.id == request.video_id
+        )
+    )
+
     video = result.scalar_one_or_none()
-    
+
     if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-    
+
+        raise HTTPException(
+            status_code=404,
+            detail="Video not found"
+        )
+
     if video.status != "uploaded":
-        raise HTTPException(status_code=400, detail="Video must be in 'uploaded' status")
-    
+
+        raise HTTPException(
+            status_code=400,
+            detail="Video must be in 'uploaded' status"
+        )
+
+    # ---------------------------------------------------------
     # Create analysis record
+    # ---------------------------------------------------------
+
     analysis = Analysis(
         video_id=request.video_id,
         status="pending"
     )
+
     db.add(analysis)
+
     await db.commit()
+
     await db.refresh(analysis)
-    
+
+    # ---------------------------------------------------------
     # Start background processing
+    # ---------------------------------------------------------
+
     background_tasks.add_task(
         process_video_task,
         analysis.id,
         video.file_path,
         db
     )
-    
+
     return analysis
 
 
-async def process_video_task(analysis_id: int, video_path: str, db: AsyncSession):
+# =============================================================
+# PROCESS VIDEO TASK
+# =============================================================
+
+async def process_video_task(
+    analysis_id: int,
+    video_path: str,
+    db: AsyncSession
+):
     """
     Background task to process video
     """
+
     try:
-        # Update status to running
-        result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+
+        # -----------------------------------------------------
+        # Get analysis
+        # -----------------------------------------------------
+
+        result = await db.execute(
+            select(Analysis).where(
+                Analysis.id == analysis_id
+            )
+        )
+
         analysis = result.scalar_one_or_none()
+
         if not analysis:
             return
-        
+
+        # -----------------------------------------------------
+        # Update status
+        # -----------------------------------------------------
+
         analysis.status = "running"
-        analysis.processing_started_at = analysis.started_at
+
         await db.commit()
-        
-        # Get video info
-        video_info = processor.get_video_info(video_path)
-        analysis.total_frames = video_info["frame_count"]
+
+        # -----------------------------------------------------
+        # Get video information
+        # -----------------------------------------------------
+
+        video_info = processor.get_video_info(
+            video_path
+        )
+
+        analysis.total_frames = (
+            video_info["frame_count"]
+        )
+
         await db.commit()
-        
-        # Process video
+
+        # -----------------------------------------------------
+        # Processing buffers
+        # -----------------------------------------------------
+
         metrics_buffer = []
+
         alerts_buffer = []
+
         max_risk_score = 0
+
         people_counts = []
+
         densities = []
+
         flow_rates = []
+
         previous_risk_score = None
-        
+
+        # -----------------------------------------------------
+        # Progress callback
+        # -----------------------------------------------------
+
         async def progress_callback(
             analysis_id: int,
             progress: float
         ):
+
             await update_analysis_progress(
                 analysis_id,
                 progress,
                 db
             )
 
+        # -----------------------------------------------------
+        # Process video
+        # -----------------------------------------------------
 
         async for frame_result in processor.process_video(
             video_path,
@@ -116,266 +268,654 @@ async def process_video_task(analysis_id: int, video_path: str, db: AsyncSession
             progress_callback=progress_callback,
             detection_interval=5
         ):
+
+            # -------------------------------------------------
             # Store metrics
+            # -------------------------------------------------
+
             metric = AnalysisMetric(
                 analysis_id=analysis_id,
-                frame_number=frame_result["frame_number"],
-                timestamp=frame_result["timestamp"],
-                people_count=frame_result["people_count"],
-                density=frame_result["density"],
-                flow_rate=frame_result["flow_metrics"]["flow_rate"],
-                avg_velocity=frame_result["flow_metrics"]["avg_velocity"],
-                risk_score=frame_result["risk_result"]["risk_score"],
-                risk_level=frame_result["risk_result"]["risk_level"]
+                frame_number=frame_result[
+                    "frame_number"
+                ],
+                timestamp=frame_result[
+                    "timestamp"
+                ],
+                people_count=frame_result[
+                    "people_count"
+                ],
+                density=frame_result[
+                    "density"
+                ],
+                flow_rate=frame_result[
+                    "flow_metrics"
+                ]["flow_rate"],
+                avg_velocity=frame_result[
+                    "flow_metrics"
+                ]["avg_velocity"],
+                risk_score=frame_result[
+                    "risk_result"
+                ]["risk_score"],
+                risk_level=frame_result[
+                    "risk_result"
+                ]["risk_level"]
             )
+
             metrics_buffer.append(metric)
-            
-            # Check for alerts
-            should_alert, alert_reason = risk_engine.should_trigger_alert(
-                frame_result["risk_result"],
-                previous_risk=previous_risk_score
+
+            # -------------------------------------------------
+            # Check alerts
+            # -------------------------------------------------
+
+            should_alert, alert_reason = (
+                risk_engine.should_trigger_alert(
+                    frame_result["risk_result"],
+                    previous_risk=previous_risk_score
+                )
             )
-            
+
             if should_alert:
+
                 alert = Alert(
                     analysis_id=analysis_id,
-                    severity=frame_result["risk_result"]["risk_level"],
-                    risk_score=frame_result["risk_result"]["risk_score"],
+                    severity=frame_result[
+                        "risk_result"
+                    ]["risk_level"],
+                    risk_score=frame_result[
+                        "risk_result"
+                    ]["risk_score"],
                     reason=alert_reason
                 )
+
                 alerts_buffer.append(alert)
-            
-            # Track aggregates
-            max_risk_score = max(max_risk_score, frame_result["risk_result"]["risk_score"])
-            people_counts.append(frame_result["people_count"])
-            densities.append(frame_result["density"])
-            flow_rates.append(frame_result["flow_metrics"]["flow_rate"])
-            previous_risk_score = frame_result["risk_result"]["risk_score"]
-            
-            # Batch insert every 10 frames
+
+            # -------------------------------------------------
+            # Aggregates
+            # -------------------------------------------------
+
+            max_risk_score = max(
+                max_risk_score,
+                frame_result[
+                    "risk_result"
+                ]["risk_score"]
+            )
+
+            people_counts.append(
+                frame_result["people_count"]
+            )
+
+            densities.append(
+                frame_result["density"]
+            )
+
+            flow_rates.append(
+                frame_result[
+                    "flow_metrics"
+                ]["flow_rate"]
+            )
+
+            previous_risk_score = (
+                frame_result[
+                    "risk_result"
+                ]["risk_score"]
+            )
+
+            # -------------------------------------------------
+            # Batch insert metrics
+            # -------------------------------------------------
+
             if len(metrics_buffer) >= 10:
-                db.add_all(metrics_buffer)
-                
-                # Update progress
-                result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
-                current_analysis = result.scalar_one_or_none()
+
+                db.add_all(
+                    metrics_buffer
+                )
+
+                result = await db.execute(
+                    select(Analysis).where(
+                        Analysis.id == analysis_id
+                    )
+                )
+
+                current_analysis = (
+                    result.scalar_one_or_none()
+                )
+
                 if current_analysis:
-                    current_analysis.frames_processed = frame_result["frame_number"]
-                    
+
+                    current_analysis.frames_processed = (
+                        frame_result["frame_number"]
+                    )
+
                 await db.commit()
+
                 metrics_buffer.clear()
-            
-            # Batch insert alerts every 5
+
+            # -------------------------------------------------
+            # Batch insert alerts
+            # -------------------------------------------------
+
             if len(alerts_buffer) >= 5:
-                db.add_all(alerts_buffer)
+
+                db.add_all(
+                    alerts_buffer
+                )
+
                 await db.commit()
+
                 alerts_buffer.clear()
-        
-        # Insert remaining metrics
+
+        # -----------------------------------------------------
+        # Remaining metrics
+        # -----------------------------------------------------
+
         if metrics_buffer:
-            db.add_all(metrics_buffer)
+
+            db.add_all(
+                metrics_buffer
+            )
+
             await db.commit()
-        
-        # Insert remaining alerts
+
+        # -----------------------------------------------------
+        # Remaining alerts
+        # -----------------------------------------------------
+
         if alerts_buffer:
-            db.add_all(alerts_buffer)
+
+            db.add_all(
+                alerts_buffer
+            )
+
             await db.commit()
-        
+
+        # -----------------------------------------------------
         # Calculate aggregates
-        analysis.frames_processed = analysis.total_frames
+        # -----------------------------------------------------
+
+        analysis.frames_processed = (
+            analysis.total_frames
+        )
 
         analysis.avg_people_count = (
-            sum(people_counts) / len(people_counts)
-            if people_counts else 0
+            sum(people_counts)
+            /
+            len(people_counts)
+            if people_counts
+            else 0
         )
 
         analysis.max_people_count = (
             max(people_counts)
-            if people_counts else 0
+            if people_counts
+            else 0
         )
 
-        
-        # Diagnostic: total track IDs generated during the video.
+        # -----------------------------------------------------
+        # Diagnostic track ID count
+        #
+        # NOTE:
         # This is NOT the actual number of unique people.
-        analysis.unique_people_count = len(
-            processor.unique_track_ids
+        # -----------------------------------------------------
+
+        analysis.unique_people_count = (
+            len(processor.unique_track_ids)
         )
 
         analysis.avg_density = (
-            sum(densities) / len(densities)
-            if densities else 0
+            sum(densities)
+            /
+            len(densities)
+            if densities
+            else 0
         )
-        analysis.max_density = max(densities) if densities else 0
-        analysis.avg_flow_rate = sum(flow_rates) / len(flow_rates) if flow_rates else 0
-        analysis.max_risk_score = max_risk_score
+
+        analysis.max_density = (
+            max(densities)
+            if densities
+            else 0
+        )
+
+        analysis.avg_flow_rate = (
+            sum(flow_rates)
+            /
+            len(flow_rates)
+            if flow_rates
+            else 0
+        )
+
+        analysis.max_risk_score = (
+            max_risk_score
+        )
+
         analysis.status = "completed"
-        analysis.completed_at = analysis.started_at  # Will be updated by DB
-        
+
+        analysis.completed_at = (
+            analysis.started_at
+        )
+
+        # -----------------------------------------------------
         # Update video status
-        video_result = await db.execute(select(Video).where(Video.id == analysis.video_id))
+        # -----------------------------------------------------
+
+        video_result = await db.execute(
+            select(Video).where(
+                Video.id == analysis.video_id
+            )
+        )
+
         video = video_result.scalar_one_or_none()
+
         if video:
+
             video.status = "completed"
-            video.processing_completed_at = analysis.started_at
-        
+
+            video.processing_completed_at = (
+                analysis.started_at
+            )
+
         await db.commit()
-        
+
     except Exception as e:
+
+        logger.exception(
+            "Video processing failed"
+        )
+
+        # -----------------------------------------------------
         # Update status to failed
-        result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+        # -----------------------------------------------------
+
+        result = await db.execute(
+            select(Analysis).where(
+                Analysis.id == analysis_id
+            )
+        )
+
         analysis = result.scalar_one_or_none()
+
         if analysis:
+
             analysis.status = "failed"
+
             analysis.error_message = str(e)
+
             await db.commit()
 
 
-@router.get("/", response_model=List[AnalysisResponse])
-async def list_analyses(db: AsyncSession = Depends(get_db)):
+
+# =============================================================
+# LIST ANALYSES
+# =============================================================
+
+@router.get(
+    "/",
+    response_model=List[AnalysisResponse]
+)
+async def list_analyses(
+    db: AsyncSession = Depends(get_db)
+):
     """List all analyses"""
-    result = await db.execute(select(Analysis).order_by(Analysis.started_at.desc()))
+
+    result = await db.execute(
+        select(Analysis).order_by(
+            Analysis.started_at.desc()
+        )
+    )
+
     analyses = result.scalars().all()
+
     return analyses
 
 
-@router.get("/{analysis_id}", response_model=AnalysisResponse)
-async def get_analysis(analysis_id: int, db: AsyncSession = Depends(get_db)):
+# =============================================================
+# GET ANALYSIS
+# =============================================================
+
+@router.get(
+    "/{analysis_id}",
+    response_model=AnalysisResponse
+)
+async def get_analysis(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db)
+):
     """Get analysis details"""
-    result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+
+    result = await db.execute(
+        select(Analysis).where(
+            Analysis.id == analysis_id
+        )
+    )
+
     analysis = result.scalar_one_or_none()
-    
+
     if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    
+
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found"
+        )
+
     return analysis
 
 
-@router.get("/{analysis_id}/metrics", response_model=List[AnalysisMetricResponse])
+# =============================================================
+# GET ANALYSIS METRICS
+# =============================================================
+
+@router.get(
+    "/{analysis_id}/metrics",
+    response_model=List[
+        AnalysisMetricResponse
+    ]
+)
 async def get_analysis_metrics(
     analysis_id: int,
     limit: Optional[int] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Get time-series metrics for an analysis"""
-    # Verify analysis exists
-    result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+
+    # ---------------------------------------------------------
+    # Verify analysis
+    # ---------------------------------------------------------
+
+    result = await db.execute(
+        select(Analysis).where(
+            Analysis.id == analysis_id
+        )
+    )
+
     analysis = result.scalar_one_or_none()
-    
+
     if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    
-    query = select(AnalysisMetric).where(
-        AnalysisMetric.analysis_id == analysis_id
-    ).order_by(AnalysisMetric.frame_number)
-    
+
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found"
+        )
+
+    # ---------------------------------------------------------
+    # Query metrics
+    # ---------------------------------------------------------
+
+    query = (
+        select(AnalysisMetric)
+        .where(
+            AnalysisMetric.analysis_id
+            ==
+            analysis_id
+        )
+        .order_by(
+            AnalysisMetric.frame_number
+        )
+    )
+
     if limit:
-        query = query.limit(limit)
-    
-    result = await db.execute(query)
+
+        query = query.limit(
+            limit
+        )
+
+    result = await db.execute(
+        query
+    )
+
     metrics = result.scalars().all()
+
     return metrics
 
 
-@router.post("/{analysis_id}/zones", response_model=ZoneResponse)
+# =============================================================
+# CREATE ZONE
+# =============================================================
+
+@router.post(
+    "/{analysis_id}/zones",
+    response_model=ZoneResponse
+)
 async def create_zone(
     analysis_id: int,
     zone: ZoneCreate,
     db: AsyncSession = Depends(get_db)
 ):
     """Create a zone for an analysis"""
-    # Verify analysis exists
-    result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+
+    # ---------------------------------------------------------
+    # Verify analysis
+    # ---------------------------------------------------------
+
+    result = await db.execute(
+        select(Analysis).where(
+            Analysis.id == analysis_id
+        )
+    )
+
     analysis = result.scalar_one_or_none()
-    
+
     if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    
+
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found"
+        )
+
+    # ---------------------------------------------------------
     # Create zone
+    # ---------------------------------------------------------
+
     new_zone = Zone(
         analysis_id=analysis_id,
         name=zone.name,
-        polygon_coordinates=zone.polygon_coordinates,
-        density_threshold=zone.density_threshold,
-        flow_threshold=zone.flow_threshold
+        polygon_coordinates=(
+            zone.polygon_coordinates
+        ),
+        density_threshold=(
+            zone.density_threshold
+        ),
+        flow_threshold=(
+            zone.flow_threshold
+        )
     )
-    
+
     db.add(new_zone)
+
     await db.commit()
-    await db.refresh(new_zone)
-    
+
+    await db.refresh(
+        new_zone
+    )
+
     return new_zone
 
 
-@router.get("/{analysis_id}/zones", response_model=List[ZoneResponse])
-async def get_zones(analysis_id: int, db: AsyncSession = Depends(get_db)):
+# =============================================================
+# GET ZONES
+# =============================================================
+
+@router.get(
+    "/{analysis_id}/zones",
+    response_model=List[ZoneResponse]
+)
+async def get_zones(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db)
+):
     """Get zones for an analysis"""
+
     result = await db.execute(
-        select(Zone).where(Zone.analysis_id == analysis_id)
+        select(Zone).where(
+            Zone.analysis_id
+            ==
+            analysis_id
+        )
     )
+
     zones = result.scalars().all()
+
     return zones
 
 
-@router.get("/{analysis_id}/alerts", response_model=List[AlertResponse])
-async def get_alerts(analysis_id: int, db: AsyncSession = Depends(get_db)):
+# =============================================================
+# GET ALERTS
+# =============================================================
+
+@router.get(
+    "/{analysis_id}/alerts",
+    response_model=List[AlertResponse]
+)
+async def get_alerts(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db)
+):
     """Get alerts for an analysis"""
+
     result = await db.execute(
-        select(Alert).where(Alert.analysis_id == analysis_id).order_by(Alert.timestamp.desc())
+        select(Alert)
+        .where(
+            Alert.analysis_id
+            ==
+            analysis_id
+        )
+        .order_by(
+            Alert.timestamp.desc()
+        )
     )
+
     alerts = result.scalars().all()
+
     return alerts
 
 
-@router.put("/{analysis_id}/alerts/{alert_id}/acknowledge")
+# =============================================================
+# ACKNOWLEDGE ALERT
+# =============================================================
+
+@router.put(
+    "/{analysis_id}/alerts/{alert_id}/acknowledge"
+)
 async def acknowledge_alert(
     analysis_id: int,
     alert_id: int,
     db: AsyncSession = Depends(get_db)
 ):
     """Acknowledge an alert"""
+
     result = await db.execute(
         select(Alert).where(
             Alert.id == alert_id,
             Alert.analysis_id == analysis_id
         )
     )
+
     alert = result.scalar_one_or_none()
-    
+
     if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    
+
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found"
+        )
+
     alert.acknowledged = True
+
     alert.acknowledged_at = func.now()
-    
+
     await db.commit()
-    await db.refresh(alert)
-    
-    return {"message": "Alert acknowledged successfully", "alert_id": alert_id}
+
+    await db.refresh(
+        alert
+    )
+
+    return {
+        "message": (
+            "Alert acknowledged successfully"
+        ),
+        "alert_id": alert_id
+    }
 
 
-import os
+# =============================================================
+# DELETE ANALYSIS
+# =============================================================
 
-@router.delete("/{analysis_id}")
-async def delete_analysis(analysis_id: int, db: AsyncSession = Depends(get_db)):
-    """Delete an analysis, its metrics/alerts, and the physical video file"""
-    result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+@router.delete(
+    "/{analysis_id}"
+)
+async def delete_analysis(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete an analysis, its metrics/alerts,
+    and associated video.
+    """
+
+    # ---------------------------------------------------------
+    # Find analysis
+    # ---------------------------------------------------------
+
+    result = await db.execute(
+        select(Analysis).where(
+            Analysis.id == analysis_id
+        )
+    )
+
     analysis = result.scalar_one_or_none()
-    
+
     if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-        
-    # Get associated video to delete physical file
-    video_result = await db.execute(select(Video).where(Video.id == analysis.video_id))
-    video = video_result.scalar_one_or_none()
-    
+
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found"
+        )
+
+   
+    # ---------------------------------------------------------
+    # Get associated video
+    # ---------------------------------------------------------
+
+    video_result = await db.execute(
+        select(Video).where(
+            Video.id == analysis.video_id
+        )
+    )
+
+    video = (
+        video_result.scalar_one_or_none()
+    )
+
+    # ---------------------------------------------------------
+    # Delete video file and record
+    # ---------------------------------------------------------
+
     if video:
-        # Delete physical file from uploads folder
-        if os.path.exists(video.file_path):
-            os.remove(video.file_path)
-        # Delete video DB record
-        await db.delete(video)
-        
-    await db.delete(analysis)
+
+        if os.path.exists(
+            video.file_path
+        ):
+
+            os.remove(
+                video.file_path
+            )
+
+        await db.delete(
+            video
+        )
+
+    # ---------------------------------------------------------
+    # Delete analysis
+    # ---------------------------------------------------------
+
+    await db.delete(
+        analysis
+    )
+
     await db.commit()
-    
-    return {"message": "Analysis and video deleted successfully"}
+
+    return {
+        "message": (
+            "Analysis and video "
+            "deleted successfully"
+        )
+    }

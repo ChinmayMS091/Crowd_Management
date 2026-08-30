@@ -445,20 +445,19 @@ class SimpleTracker:
 
             track = {
                 "track_id": track_id,
-
                 "bbox": bbox,
-
                 "confidence": detection.get(
                     "confidence",
                     1.0
                 ),
-
                 "center": center,
-
                 "velocity": (
                     0.0,
                     0.0
                 ),
+
+                # Movement has not been measured yet.
+                "movement_initialized": False,
 
                 "age": 1,
 
@@ -577,7 +576,7 @@ class SimpleTracker:
             +
             movement_y * 0.7
         )
-
+        track["movement_initialized"] = True
         track["bbox"] = detection["bbox"]
 
         track["confidence"] = detection.get(
