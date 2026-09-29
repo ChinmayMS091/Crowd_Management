@@ -45,27 +45,51 @@ class LiveProcessor:
     def __init__(self):
         """Initialize live processing components."""
 
+        # ---------------------------------------------------------
+        # AI Components
+        # ---------------------------------------------------------
+
         self.detector = PersonDetector(
             confidence_threshold=0.50
         )
+
         self.tracker = SimpleTracker()
         self.analytics: Optional[CrowdAnalytics] = None
         self.risk_engine = RiskEngine()
 
+        # ---------------------------------------------------------
         # Track IDs seen during this live session
+        # ---------------------------------------------------------
+
         self.unique_track_ids = set()
 
+        # ---------------------------------------------------------
         # Stream state
+        # ---------------------------------------------------------
+
         self.running = False
         self.connected = False
 
+        # ---------------------------------------------------------
         # Current camera information
+        # ---------------------------------------------------------
+
         self.camera_id = None
         self.frame_number = 0
 
-        # Latest processed frame result
-        # Used by the API / WebSocket
+        # ---------------------------------------------------------
+        # Latest processed result
+        # Used by API / WebSocket
+        # ---------------------------------------------------------
+
         self.latest_result: Optional[Dict] = None
+
+        # ---------------------------------------------------------
+        # Latest camera frame
+        # Used by MJPEG live video stream
+        # ---------------------------------------------------------
+
+        self.latest_frame: Optional[np.ndarray] = None
 
     async def process_stream(
         self,
@@ -77,10 +101,15 @@ class LiveProcessor:
         Process a live webcam / RTSP stream.
         """
 
+        # ---------------------------------------------------------
+        # Reset live session state
+        # ---------------------------------------------------------
+
         self.camera_id = camera_id
         self.frame_number = 0
         self.unique_track_ids.clear()
         self.latest_result = None
+        self.latest_frame = None
 
         # ---------------------------------------------------------
         # Open camera / RTSP stream
@@ -194,6 +223,16 @@ class LiveProcessor:
                 self.connected = True
 
                 # -------------------------------------------------
+                # Store latest camera frame
+                #
+                # This is used by the MJPEG streaming endpoint.
+                # copy() prevents the OpenCV buffer from being
+                # reused while the API is reading the frame.
+                # -------------------------------------------------
+
+                self.latest_frame = frame.copy()
+
+                # -------------------------------------------------
                 # Process frame
                 # -------------------------------------------------
 
@@ -206,12 +245,17 @@ class LiveProcessor:
                     detection_interval=detection_interval,
                 )
 
+                # -------------------------------------------------
                 # Add live-specific information
+                # -------------------------------------------------
+
                 result["camera_id"] = camera_id
                 result["stream_status"] = "online"
 
+                # -------------------------------------------------
                 # Store latest result
-                # This will be used by the WebSocket/API
+                # -------------------------------------------------
+
                 self.latest_result = result
 
                 # -------------------------------------------------
@@ -421,25 +465,33 @@ class LiveProcessor:
             ),
         }
 
+        # ---------------------------------------------------------
         # Add latest live metrics if available
+        # ---------------------------------------------------------
+
         if self.latest_result:
 
             status["metrics"] = {
                 "people_count": self.latest_result.get(
                     "people_count"
                 ),
+
                 "density": self.latest_result.get(
                     "density"
                 ),
+
                 "flow_metrics": self.latest_result.get(
                     "flow_metrics"
                 ),
+
                 "is_bottleneck": self.latest_result.get(
                     "is_bottleneck"
                 ),
+
                 "bottleneck_reason": self.latest_result.get(
                     "bottleneck_reason"
                 ),
+
                 "risk_result": self.latest_result.get(
                     "risk_result"
                 ),

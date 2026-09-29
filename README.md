@@ -1,238 +1,462 @@
-# 🚨 CrowdSentinel AI
+# CrowdSentinel AI
 
-<div align="center">
-
-**AI-powered early crowd-risk monitoring and decision-support system.**  
-*Developed for the Smart India Hackathon (SIH) 2026 (Problem Statement ID: SIH26AI006)*
-
-[![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![YOLOv8](https://img.shields.io/badge/YOLO-v8n-FF6F00?logo=ultralytics&logoColor=white)](https://github.com/ultralytics/ultralytics)
-[![License](https://img.shields.io/badge/License-SIH_2026-green)](LICENSE)
-
-[**Explore API**](#api-endpoints) • [**Setup Guide**](#installation) • [**System Architecture**](#architecture)
-
-</div>
+AI-powered early crowd-risk monitoring and decision-support system for detecting crowd conditions, analyzing movement patterns, identifying bottlenecks, and assessing potential crowd-risk situations.
 
 ---
 
-## 📋 Table of Contents
-1. [Overview](#-overview)
-2. [Architecture](#-architecture)
-3. [Tech Stack](#-tech-stack)
-4. [Project Structure](#-project-structure)
-5. [Installation](#-installation)
-6. [Core Capabilities (Phases 1-12)](#-core-capabilities-phases-1-12-implemented)
-7. [Risk Metrics & Alerts](#-risk-metrics--alerts)
-8. [Dynamic Integration Verification](#-real-video-integration-verification)
-9. [Development Notes](#-development-notes)
+## Overview
+
+CrowdSentinel AI is a computer-vision-based crowd monitoring system designed to analyze both recorded videos and live CCTV/webcam streams.
+
+The system uses YOLOv8 for person detection, custom multi-object tracking, crowd analytics, bottleneck detection, and a weighted risk engine to provide real-time and historical crowd insights.
+
+The project currently supports two primary workflows:
+
+1. **Video Processing** — Analyze recorded crowd videos.
+2. **Live CCTV** — Monitor a webcam/live camera stream in real time.
 
 ---
 
-## 🔍 Overview
+## Key Features
 
-**CrowdSentinel AI** is a state-of-the-art surveillance analytics platform designed to solve the critical challenges of crowd control, congestion bottlenecks, and stampede prevention. By processing live video feeds, the system detects crowd density, measures flow velocity, isolates bottlenecks, and calculates a dynamic risk index using real-time machine learning inference.
+### Video Processing
 
-### Key Objectives
-* 🚶 **Automated Detection:** Localize and count individuals in complex, high-occupancy video scenes.
-* 📈 **Risk Calculation:** Compute real-time crowd dynamics based on density and velocity metrics.
-* ⚠️ **Proactive Alerts:** Auto-generate and log warning notifications before safety thresholds are breached.
-* 📊 **SIH-Ready Visualizations:** View interactive dashboards, historical charts, and synced video replays.
+The recorded-video pipeline supports:
 
----
-
-## 🏗️ Architecture
-
-```
-                  ┌──────────────────────────────┐
-                  │   Real-Time Video Stream     │
-                  └──────────────┬───────────────┘
-                                 │
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │    FastAPI Video Processor   │
-                  └──────────────┬───────────────┘
-                                 │
-         ┌───────────────────────┴───────────────────────┐
-         ▼                                               ▼
-┌─────────────────┐                             ┌─────────────────┐
-│   YOLOv8 Class  │                             │   ByteTrack IoU │
-│ Person Detector │                             │  Multi-Tracker  │
-└────────┬────────┘                             └────────┬────────┘
-         │                                               │
-         └───────────────────────┬───────────────────────┘
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │    Crowd Analytics Engine    │
-                  │  (Density, Velocity & Flow)  │
-                  └──────────────┬───────────────┘
-                                 │
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │      Bottleneck Analyzer     │
-                  └──────────────┬───────────────┘
-                                 │
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │    Weighted Risk Engine      │
-                  └──────────────┬───────────────┘
-                                 │
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │     Alert Logger & API       │
-                  └──────────────┬───────────────┘
-                                 │
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │  Next.js 15 Web Dashboard    │
-                  │  (Recharts & Video Player)   │
-                  └──────────────────────────────┘
-```
+- Video upload and processing
+- YOLOv8 person detection
+- Person tracking
+- People counting
+- Crowd density calculation
+- Crowd flow analysis
+- Average movement velocity
+- Bottleneck detection
+- Risk score calculation
+- Risk-level classification
+- Historical analysis
+- Analysis metrics
+- Alert generation
+- PostgreSQL-based data storage
 
 ---
 
-## 💻 Tech Stack
+### Live CCTV Monitoring
 
-### Frontend Hub
-* **Next.js 15 (App Router)** - Server-side rendering, layout management, and optimization.
-* **TypeScript** - Strict typings for data structure consistency.
-* **Tailwind CSS** - Modern styling and responsive utility classes.
-* **Recharts** - Fully responsive SVG charts (Risk areas, density lines, velocity profiles).
+The live CCTV pipeline supports:
 
-### Analytics Backend
-* **FastAPI** - Ultra-fast, async Python web API framework.
-* **SQLAlchemy 2.0 (Async)** - Non-blocking database transactions.
-* **PostgreSQL / SQLite** - Multi-environment schema configuration.
-* **Ultralytics YOLOv8** - State-of-the-art person object detection models.
-* **OpenCV & NumPy** - Video frame manipulations and spatial array computations.
+- Webcam camera input
+- Live camera start/stop
+- Real-time YOLOv8 person detection
+- Real-time people counting
+- Multi-object tracking
+- Crowd density calculation
+- Crowd flow analysis
+- Average movement velocity
+- Bottleneck detection
+- Real-time risk score
+- Real-time risk-level classification
+- Live camera status
+- Real-time frontend metric updates
+
+The live processing pipeline is implemented separately from the recorded-video pipeline while reusing the existing AI components.
 
 ---
 
-## 📁 Project Structure
+## System Architecture
 
-```
-Crowd-Management-and-Stampede-protection/
-├── frontend/                     # Next.js 15 App
-│   ├── src/app/
-│   │   ├── page.tsx             # Home: Video uploader & Progress UI
-│   │   ├── analyses/            # Historical Analysis list & reports
-│   │   ├── dashboard/           # SIH-Quality Analytics dashboard view
-│   │   └── layout.tsx           # Global HTML/styles template
-│   └── package.json             # Node dependencies (Next, React, Recharts)
-├── backend/                      # Python FastAPI App
-│   ├── ai/                      # Computer Vision Pipeline
-│   │   ├── detection.py         # YOLO person localized detection
-│   │   ├── tracking.py          # Temporal object trajectory matching
-│   │   ├── analytics.py         # Density & crowd movement consistency
-│   │   ├── risk_engine.py       # Rule-based threat index compiler
-│   │   └── video_processor.py   # Stream frame coordinator
-│   ├── api/                     # API Routes
-│   │   ├── videos.py            # Video storage, deletion & streaming
-│   │   └── analysis.py          # Analytics status, charts, alert ack
-│   ├── main.py                  # Entry server script
-│   ├── requirements.txt         # Python package list
-│   └── .env.example             # Config template
+```text
+                         CrowdSentinel AI
+                                |
+                +---------------+---------------+
+                |                               |
+                |                               |
+        Video Processing                    Live CCTV
+        Recorded Video                  Webcam / Camera
+                |                               |
+                +---------------+---------------+
+                                |
+                         OpenCV Processing
+                                |
+                         YOLOv8 Detection
+                                |
+                        Person Detection
+                                |
+                       Multi-Object Tracking
+                                |
+                        Crowd Analytics
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+           Density             Flow          Bottleneck
+              |                 |                 |
+              +-----------------+-----------------+
+                                |
+                          Risk Engine
+                                |
+                    Risk Score / Risk Level
+                                |
+                         FastAPI Backend
+                                |
+                         Next.js Frontend
+                                |
+                     CrowdSentinel Dashboard
+Technology Stack
+Backend
+Python
+FastAPI
+OpenCV
+Ultralytics YOLOv8
+NumPy
+SQLAlchemy
+PostgreSQL
+Async Python processing
+Frontend
+Next.js
+React
+TypeScript
+Tailwind CSS
+Computer Vision
+YOLOv8
+OpenCV
+Custom multi-object tracking
+Crowd density analysis
+Crowd flow analysis
+Bottleneck detection
+Database
+PostgreSQL
+SQLAlchemy
+Project Structure
+Crowd_Management/
+│
+├── backend/
+│   │
+│   ├── ai/
+│   │   ├── detection.py
+│   │   ├── tracking.py
+│   │   ├── analytics.py
+│   │   └── risk_engine.py
+│   │
+│   ├── api/
+│   │   ├── analysis.py
+│   │   ├── videos.py
+│   │   └── live.py
+│   │
+│   ├── live/
+│   │   └── live_processor.py
+│   │
+│   ├── models/
+│   │   └── yolov8m.pt
+│   │
+│   ├── uploads/
+│   │
+│   ├── processed/
+│   │
+│   ├── database.py
+│   ├── config.py
+│   └── main.py
+│
+├── frontend/
+│   │
+│   ├── public/
+│   │
+│   ├── src/
+│   │   └── app/
+│   │       ├── page.tsx
+│   │       │
+│   │       ├── cctv/
+│   │       │   └── page.tsx
+│   │       │
+│   │       ├── dashboard/
+│   │       │   └── page.tsx
+│   │       │
+│   │       ├── analyses/
+│   │       │   ├── page.tsx
+│   │       │   └── [id]/
+│   │       │       └── page.tsx
+│   │       │
+│   │       ├── globals.css
+│   │       └── layout.tsx
+│   │
+│   ├── package.json
+│   ├── next.config.ts
+│   └── tsconfig.json
+│
 └── README.md
-```
+Application Navigation
 
----
+The main user-facing navigation currently contains two primary sections:
 
-## 🚀 Installation
++---------------------+
+| CrowdSentinel AI    |
++---------------------+
+| Video Processing    |
+| Live CCTV           |
++---------------------+
+Video Processing
 
-### 1. Backend Service Setup
-```bash
-# Enter backend folder
-cd backend
+Used for uploading and analyzing recorded videos.
 
-# Establish python virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+Live CCTV
 
-# Install dependencies
-pip install -r requirements.txt
+Used for connecting to a webcam/live camera and monitoring crowd conditions in real time.
 
-# Create your config file
-cp .env.example .env
+Video Processing Pipeline
 
-# Initialize database schemas
-python init_db.py
+The recorded-video processing pipeline follows:
 
-# Run development server
-python main.py
-```
-*API Docs will serve at: `http://localhost:8000/docs`*
+Video Upload
+     |
+     v
+OpenCV Video Reader
+     |
+     v
+Frame Extraction
+     |
+     v
+YOLOv8 Person Detection
+     |
+     v
+Person Tracking
+     |
+     v
+Crowd Analytics
+     |
+     +----> People Count
+     |
+     +----> Density
+     |
+     +----> Flow
+     |
+     +----> Velocity
+     |
+     +----> Bottleneck
+     |
+     v
+Risk Engine
+     |
+     v
+Risk Score / Risk Level
+     |
+     v
+PostgreSQL
+     |
+     v
+Dashboard
+Live CCTV Pipeline
 
-### 2. Frontend Dashboard Setup
-```bash
-# Enter frontend folder
-cd ../frontend
+The live CCTV pipeline is implemented separately from the recorded-video processor.
 
-# Install node dependencies
-npm install
+Webcam / CCTV
+      |
+      v
+OpenCV VideoCapture
+      |
+      v
+YOLOv8 Person Detection
+      |
+      v
+SimpleTracker
+      |
+      v
+Crowd Analytics
+      |
+      +----> People Count
+      |
+      +----> Density
+      |
+      +----> Flow Metrics
+      |
+      +----> Average Velocity
+      |
+      +----> Bottleneck
+      |
+      v
+Risk Engine
+      |
+      +----> Risk Score
+      |
+      +----> Risk Level
+      |
+      v
+FastAPI Live API
+      |
+      v
+Next.js Live CCTV Page
+YOLOv8 Person Detection
 
-# Boot development environment
-npm run dev
-```
-*Web dashboard opens at: `http://localhost:3000`*
+The system uses YOLOv8 for detecting people in video frames.
 
----
+The person class is:
 
-## ⚡ Core Capabilities (Phases 1-12 Implemented)
+Class ID: 0
+Class: person
 
-* 💾 **Phase 1: DB Scheme** - Async engine managing database records for videos, historical analysis runs, and generated alerts.
-* 👁️ **Phase 2: Person Detection** - Precise COCO `person` extraction powered by pre-loaded YOLO models.
-* 📍 **Phase 3: Trajectory Tracking** - Keeps persistent target IDs across frame segments to track movement trajectories.
-* 👥 **Phase 4: People Counter** - Precise count of active targets in the monitored space.
-* 📏 **Phase 5: Density Analysis** - Normalized area density scoring computed from spatial bounding boxes.
-* 🌀 **Phase 6: Flow & Velocity** - Track directional consistency, velocity vector coordinates, and frame flow rate.
-* 🚧 **Phase 7: Bottleneck Isolation** - Instant warning when spatial density peaks while flow speed decelerates below safety thresholds.
-* 🎛️ **Phase 8: Weighted Risk Engine** - Computes a threat index (0-100) combining density, flow directionality, and bottlenecks.
-* ⏱️ **Phase 9: Interactive Upload UX** - Live upload progress bars, cancel hooks, retry mechanisms, and processing stats.
-* 📈 **Phase 10: Real-Time Dashboard** - View aggregated stats (Max Count, Avg Density, Peak Risk) for any video.
-* 🖥️ **Phase 11: Synced Video Player** - Video player synced with a timeline displaying frame-by-frame stats, bottleneck alerts, and active risks.
-* 📊 **Phase 12: Recharts Visualizations** - Interactive area and line charts plotting risk, velocity, and density trends over time.
+The live CCTV pipeline uses a confidence threshold of:
 
----
+confidence_threshold=0.50
 
-## 🚨 Risk Metrics & Alerts
+This configuration is applied specifically to live CCTV processing.
 
-The system categorizes risk levels dynamically using a 0–100 scale:
+The recorded-video pipeline remains separate.
 
-| Score Range | Severity | Description / Action | Indicator |
-|---|---|---|:---:|
-| **0 – 30** | `SAFE` | Normal conditions; standard traffic | 🟢 |
-| **31 – 55** | `WARNING` | Elevated crowd presence; monitor density | 🟡 |
-| **56 – 75** | `HIGH` | Highly congested; restrict entries | 🟠 |
-| **76 – 100** | `CRITICAL` | Imminent danger; trigger evacuation alarms | 🔴 |
+Multi-Object Tracking
 
-### Alert Acknowledgment Flow
-The dashboard displays critical alerts generated by the pipeline. Security operators can click **Acknowledge** in the UI, which calls the backend PUT API to flag the threat as handled, providing clear audits for incident response management.
+The project uses a custom SimpleTracker for maintaining person identities across frames.
 
----
+The tracker is used to:
 
-## 🔬 Real-Video Integration Verification
+Associate detections across frames
+Maintain track IDs
+Track movement
+Calculate movement-related metrics
+Support crowd-flow analysis
+Maintain unique track counts
+Crowd Analytics
 
-We validated the pipeline on a real crowd video (`test_video_people.mp4`, 116.55s, 1280x720 @ 29.97 FPS). 
+The analytics layer calculates multiple crowd-related measurements.
 
-### Verdict: 🟢 PASS
+People Count
 
-```
-VERIFICATION CHECKS:
-  ✅ PASS: YOLO detections > 0 (Detections: 99)
-  ✅ PASS: Tracking IDs generated (IDs: 1 to 20)
-  ✅ PASS: People counted (Average: 9.90 / frame)
-  ✅ PASS: Density calculated (Average: 0.9034)
-  ✅ PASS: Flow/velocity calculated (Real movement detected)
-  ✅ PASS: Risk scores produced (Average: 71.27)
-  ✅ PASS: Risk levels assigned (High & Critical threats isolated)
-```
+Number of currently tracked people in the scene.
 
----
+people_count
+Crowd Density
 
-## 💡 Development Notes
+Density is calculated using the tracked people and camera/frame dimensions.
 
-* **No Mocks:** All metrics are calculated live from model inference and tracking trajectories.
-* **Efficient Frame Sampling:** Set `FRAME_EXTRACTION_FPS` in `.env` to sample frames (e.g., skip 30 frames for 1 FPS processing) to achieve real-time throughput on standard CPUs.
-* **Disclaimer:** Developed for educational and demonstration purposes as a Smart India Hackathon prototype. Always deploy with redundant safety systems.
+density
+Crowd Flow
+
+The system analyzes movement information from tracked people.
+
+Example metrics include:
+
+flow_rate
+avg_velocity
+flow_consistency
+movement_data_available
+Bottleneck Detection
+
+The analytics system checks crowd density and movement characteristics to identify potential bottleneck conditions.
+
+Example output:
+
+is_bottleneck
+bottleneck_reason
+Risk Engine
+
+The risk engine combines crowd-related metrics to calculate a risk result.
+
+The current result contains:
+
+risk_score
+risk_level
+components
+
+Example:
+
+{
+  "risk_score": 0.01,
+  "risk_level": "safe"
+}
+
+The risk calculation considers factors including:
+
+Crowd density
+Crowd flow
+Movement velocity
+Bottleneck conditions
+People count
+Backend API
+
+The FastAPI backend provides APIs for video analysis and live CCTV monitoring.
+
+The backend runs on:
+
+http://localhost:8000
+
+FastAPI Swagger documentation:
+
+http://localhost:8000/docs
+Live CCTV API
+Start Camera
+POST /api/live/start
+
+Example:
+
+http://localhost:8000/api/live/start?source=0&camera_id=camera_1
+
+Where:
+
+source=0
+
+represents the default webcam.
+
+Stop Camera
+POST /api/live/stop
+Live Status
+GET /api/live/status
+
+The status endpoint provides:
+
+{
+  "camera_id": "camera_1",
+  "running": true,
+  "connected": true,
+  "frame_number": 100,
+  "unique_track_count": 3,
+  "metrics": {
+    "people_count": 3,
+    "density": 0.012,
+    "flow_metrics": {},
+    "is_bottleneck": false,
+    "bottleneck_reason": "",
+    "risk_result": {}
+  }
+}
+Frontend Live CCTV Dashboard
+
+The Live CCTV page is available at:
+
+http://localhost:3000/cctv
+
+The dashboard currently provides:
+
+Camera Status
+      |
+      +---- Camera Online / Offline
+      |
+      +---- Start Camera
+      |
+      +---- Stop Camera
+
+Live Metrics
+      |
+      +---- People Count
+      |
+      +---- Density
+      |
+      +---- Flow Rate
+      |
+      +---- Average Velocity
+      |
+      +---- Bottleneck Status
+      |
+      +---- Risk Score
+      |
+      +---- Risk Level
+
+The frontend currently retrieves live status information from the backend and updates the displayed metrics in real time.
+
+Getting Started
+Prerequisites
+
+Make sure the following are installed:
+
+Python
+Node.js
+npm
+PostgreSQL
+Git
+
+A compatible Python environment is also required for the backend dependencies.

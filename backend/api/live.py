@@ -1,13 +1,15 @@
 """
 Live CCTV API
 
-API endpoints for starting, stopping, and monitoring
-the live CCTV processing pipeline.
+API endpoints for starting, stopping, monitoring,
+and streaming the live CCTV processing pipeline.
 """
 
 import asyncio
+import cv2
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from live.live_processor import LiveProcessor
 
@@ -54,9 +56,7 @@ async def run_live_stream(
             # Crowd analytics
             # Risk analysis
 
-            # For now we simply keep processing.
-            # Later this result will be sent to the
-            # frontend through WebSocket/SSE.
+            # Keep processing the stream.
             pass
 
     except asyncio.CancelledError:
@@ -73,6 +73,52 @@ async def run_live_stream(
 
 
 # ---------------------------------------------------------
+# MJPEG video stream generator
+# ---------------------------------------------------------
+
+async def generate_mjpeg_stream():
+    """
+    Generate MJPEG frames from the currently running
+    LiveProcessor camera stream.
+    """
+
+    while live_processor.running:
+
+        # Get latest camera frame
+        frame = live_processor.latest_frame
+
+        if frame is None:
+
+            await asyncio.sleep(0.05)
+            continue
+
+        # Encode frame as JPEG
+        success, encoded_frame = cv2.imencode(
+            ".jpg",
+            frame
+        )
+
+        if not success:
+
+            await asyncio.sleep(0.01)
+            continue
+
+        # Convert JPEG to bytes
+        frame_bytes = encoded_frame.tobytes()
+
+        # MJPEG frame format
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n"
+            + frame_bytes
+            + b"\r\n"
+        )
+
+        # Small delay to avoid unnecessary CPU usage
+        await asyncio.sleep(0.03)
+
+
+# ---------------------------------------------------------
 # Status
 # ---------------------------------------------------------
 
@@ -83,6 +129,22 @@ async def get_live_status():
     """
 
     return live_processor.get_status()
+
+
+# ---------------------------------------------------------
+# Live video stream
+# ---------------------------------------------------------
+
+@router.get("/stream")
+async def live_video_stream():
+    """
+    Stream the live CCTV camera feed using MJPEG.
+    """
+
+    return StreamingResponse(
+        generate_mjpeg_stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
 
 
 # ---------------------------------------------------------
