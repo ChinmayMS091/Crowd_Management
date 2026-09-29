@@ -1,6 +1,6 @@
-# CrowdSentinel AI — Frontend
+# Crowd Management AI — Frontend
 
-Next.js frontend for **CrowdSentinel AI**, an AI-powered crowd monitoring and risk analysis system.
+Next.js frontend for **Crowd Management AI**, an AI-powered crowd monitoring and risk analysis system.
 
 The frontend provides interfaces for:
 
@@ -114,7 +114,7 @@ Application Navigation
 
 The main navigation contains:
 
-CrowdSentinel AI
+Crowd Management AI
 │
 ├── Video Processing
 │
@@ -305,7 +305,7 @@ Next.js
        AI Processing
 Project
 
-CrowdSentinel AI
+Crowd Management AI
 
 AI-powered early crowd-risk monitoring and decision-support system.
 
@@ -321,9 +321,9 @@ backend/README.md
 
 with this:
 
-# CrowdSentinel AI — Backend
+# Crowd Management AI — Backend
 
-FastAPI backend for **CrowdSentinel AI**, an AI-powered crowd monitoring and risk analysis system.
+FastAPI backend for **Crowd Management AI**, an AI-powered crowd monitoring and risk analysis system.
 
 The backend handles:
 
@@ -345,7 +345,7 @@ The backend handles:
 # Architecture
 
 ```text
-                    CrowdSentinel AI Backend
+                    Crowd Management AI Backend
                               |
              +----------------+----------------+
              |                                 |
@@ -1036,7 +1036,7 @@ Register API routers
 Provide health endpoints
 Project
 
-CrowdSentinel AI
+Crowd Management AI
 
 AI-powered early crowd-risk monitoring and decision-support system for crowd monitoring, movement analysis, bottleneck detection, and risk assessment.
 
