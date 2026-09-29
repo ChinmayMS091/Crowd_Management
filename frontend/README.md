@@ -1,462 +1,369 @@
-# CrowdSentinel AI
+# CrowdSentinel AI — Frontend
 
-AI-powered early crowd-risk monitoring and decision-support system for detecting crowd conditions, analyzing movement patterns, identifying bottlenecks, and assessing potential crowd-risk situations.
+This directory contains the frontend application for **CrowdSentinel AI**, a crowd monitoring and analysis system.
 
----
-
-## Overview
-
-CrowdSentinel AI is a computer-vision-based crowd monitoring system designed to analyze both recorded videos and live CCTV/webcam streams.
-
-The system uses YOLOv8 for person detection, custom multi-object tracking, crowd analytics, bottleneck detection, and a weighted risk engine to provide real-time and historical crowd insights.
-
-The project currently supports two primary workflows:
-
-1. **Video Processing** — Analyze recorded crowd videos.
-2. **Live CCTV** — Monitor a webcam/live camera stream in real time.
+The frontend is built with **Next.js, React, TypeScript, Tailwind CSS, and Recharts**. It provides the user interface for video processing, analysis results, and live CCTV/webcam monitoring.
 
 ---
 
-## Key Features
+## Tech Stack
 
-### Video Processing
-
-The recorded-video pipeline supports:
-
-- Video upload and processing
-- YOLOv8 person detection
-- Person tracking
-- People counting
-- Crowd density calculation
-- Crowd flow analysis
-- Average movement velocity
-- Bottleneck detection
-- Risk score calculation
-- Risk-level classification
-- Historical analysis
-- Analysis metrics
-- Alert generation
-- PostgreSQL-based data storage
+- **Next.js** 16
+- **React** 19
+- **TypeScript**
+- **Tailwind CSS**
+- **Recharts**
+- **ESLint**
 
 ---
 
-### Live CCTV Monitoring
-
-The live CCTV pipeline supports:
-
-- Webcam camera input
-- Live camera start/stop
-- Real-time YOLOv8 person detection
-- Real-time people counting
-- Multi-object tracking
-- Crowd density calculation
-- Crowd flow analysis
-- Average movement velocity
-- Bottleneck detection
-- Real-time risk score
-- Real-time risk-level classification
-- Live camera status
-- Real-time frontend metric updates
-
-The live processing pipeline is implemented separately from the recorded-video pipeline while reusing the existing AI components.
-
----
-
-## System Architecture
+## Project Structure
 
 ```text
-                         CrowdSentinel AI
-                                |
-                +---------------+---------------+
-                |                               |
-                |                               |
-        Video Processing                    Live CCTV
-        Recorded Video                  Webcam / Camera
-                |                               |
-                +---------------+---------------+
-                                |
-                         OpenCV Processing
-                                |
-                         YOLOv8 Detection
-                                |
-                        Person Detection
-                                |
-                       Multi-Object Tracking
-                                |
-                        Crowd Analytics
-                                |
-              +-----------------+-----------------+
-              |                 |                 |
-           Density             Flow          Bottleneck
-              |                 |                 |
-              +-----------------+-----------------+
-                                |
-                          Risk Engine
-                                |
-                    Risk Score / Risk Level
-                                |
-                         FastAPI Backend
-                                |
-                         Next.js Frontend
-                                |
-                     CrowdSentinel Dashboard
-Technology Stack
-Backend
-Python
-FastAPI
-OpenCV
-Ultralytics YOLOv8
-NumPy
-SQLAlchemy
-PostgreSQL
-Async Python processing
-Frontend
-Next.js
-React
-TypeScript
-Tailwind CSS
-Computer Vision
-YOLOv8
-OpenCV
-Custom multi-object tracking
-Crowd density analysis
-Crowd flow analysis
-Bottleneck detection
-Database
-PostgreSQL
-SQLAlchemy
-Project Structure
-Crowd_Management/
+frontend/
+├── public/
 │
-├── backend/
-│   │
-│   ├── ai/
-│   │   ├── detection.py
-│   │   ├── tracking.py
-│   │   ├── analytics.py
-│   │   └── risk_engine.py
-│   │
-│   ├── api/
-│   │   ├── analysis.py
-│   │   ├── videos.py
-│   │   └── live.py
-│   │
-│   ├── live/
-│   │   └── live_processor.py
-│   │
-│   ├── models/
-│   │   └── yolov8m.pt
-│   │
-│   ├── uploads/
-│   │
-│   ├── processed/
-│   │
-│   ├── database.py
-│   ├── config.py
-│   └── main.py
+├── src/
+│   └── app/
+│       ├── analyses/
+│       │   ├── [id]/
+│       │   │   └── page.tsx
+│       │   └── page.tsx
+│       │
+│       ├── dashboard/
+│       │   └── page.tsx
+│       │
+│       ├── cctv/
+│       │   └── page.tsx
+│       │
+│       ├── favicon.ico
+│       ├── globals.css
+│       ├── layout.tsx
+│       └── page.tsx
 │
-├── frontend/
-│   │
-│   ├── public/
-│   │
-│   ├── src/
-│   │   └── app/
-│   │       ├── page.tsx
-│   │       │
-│   │       ├── cctv/
-│   │       │   └── page.tsx
-│   │       │
-│   │       ├── dashboard/
-│   │       │   └── page.tsx
-│   │       │
-│   │       ├── analyses/
-│   │       │   ├── page.tsx
-│   │       │   └── [id]/
-│   │       │       └── page.tsx
-│   │       │
-│   │       ├── globals.css
-│   │       └── layout.tsx
-│   │
-│   ├── package.json
-│   ├── next.config.ts
-│   └── tsconfig.json
-│
+├── package.json
+├── package-lock.json
+├── next.config.ts
+├── tsconfig.json
 └── README.md
-Application Navigation
-
-The main user-facing navigation currently contains two primary sections:
-
-+---------------------+
-| CrowdSentinel AI    |
-+---------------------+
-| Video Processing    |
-| Live CCTV           |
-+---------------------+
+Main Pages
 Video Processing
 
-Used for uploading and analyzing recorded videos.
+Route:
 
-Live CCTV
+/
 
-Used for connecting to a webcam/live camera and monitoring crowd conditions in real time.
+The main page provides the interface for uploading and processing recorded videos.
 
-Video Processing Pipeline
+The frontend communicates with the backend API to:
 
-The recorded-video processing pipeline follows:
+Upload videos
+Start video analysis
+Access analysis results
+View processed information
+Live CCTV Monitoring
 
-Video Upload
-     |
-     v
-OpenCV Video Reader
-     |
-     v
-Frame Extraction
-     |
-     v
-YOLOv8 Person Detection
-     |
-     v
-Person Tracking
-     |
-     v
-Crowd Analytics
-     |
-     +----> People Count
-     |
-     +----> Density
-     |
-     +----> Flow
-     |
-     +----> Velocity
-     |
-     +----> Bottleneck
-     |
-     v
-Risk Engine
-     |
-     v
-Risk Score / Risk Level
-     |
-     v
-PostgreSQL
-     |
-     v
-Dashboard
-Live CCTV Pipeline
+Route:
 
-The live CCTV pipeline is implemented separately from the recorded-video processor.
+/cctv
 
-Webcam / CCTV
-      |
-      v
-OpenCV VideoCapture
-      |
-      v
-YOLOv8 Person Detection
-      |
-      v
-SimpleTracker
-      |
-      v
-Crowd Analytics
-      |
-      +----> People Count
-      |
-      +----> Density
-      |
-      +----> Flow Metrics
-      |
-      +----> Average Velocity
-      |
-      +----> Bottleneck
-      |
-      v
-Risk Engine
-      |
-      +----> Risk Score
-      |
-      +----> Risk Level
-      |
-      v
-FastAPI Live API
-      |
-      v
-Next.js Live CCTV Page
-YOLOv8 Person Detection
+The Live CCTV page provides real-time monitoring.
 
-The system uses YOLOv8 for detecting people in video frames.
+It supports two input sources:
 
-The person class is:
+Live CCTV Monitoring
+│
+├── Computer Webcam
+│     └── Source: 0
+│
+└── CCTV / IP Camera
+      └── Source: RTSP URL
+Computer Webcam
 
-Class ID: 0
-Class: person
+The computer webcam uses:
 
-The live CCTV pipeline uses a confidence threshold of:
+source = 0
 
-confidence_threshold=0.50
+The frontend sends the request to the backend to start live processing.
 
-This configuration is applied specifically to live CCTV processing.
+CCTV / IP Camera
 
-The recorded-video pipeline remains separate.
+For an IP camera or CCTV system, the frontend accepts an RTSP URL.
 
-Multi-Object Tracking
+Example format:
 
-The project uses a custom SimpleTracker for maintaining person identities across frames.
+rtsp://username:password@camera-ip:port/stream
 
-The tracker is used to:
+The actual RTSP URL depends on the camera manufacturer and configuration.
 
-Associate detections across frames
-Maintain track IDs
-Track movement
-Calculate movement-related metrics
-Support crowd-flow analysis
-Maintain unique track counts
-Crowd Analytics
+Live Monitoring Metrics
 
-The analytics layer calculates multiple crowd-related measurements.
+The CCTV page displays live information received from the backend.
+
+Current metrics include:
 
 People Count
-
-Number of currently tracked people in the scene.
-
-people_count
 Crowd Density
+Flow Rate
+Average Velocity
+Risk Score
+Risk Level
+Bottleneck Status
 
-Density is calculated using the tracked people and camera/frame dimensions.
+The frontend periodically requests the live status from:
 
-density
-Crowd Flow
+GET /api/live/status
+Live Video Feed
 
-The system analyzes movement information from tracked people.
+The live camera feed is displayed using the backend MJPEG stream:
 
-Example metrics include:
+GET /api/live/stream
 
-flow_rate
-avg_velocity
-flow_consistency
-movement_data_available
-Bottleneck Detection
+The frontend uses:
 
-The analytics system checks crowd density and movement characteristics to identify potential bottleneck conditions.
+<img
+  src="http://localhost:8000/api/live/stream"
+  alt="Live Camera Feed"
+/>
 
-Example output:
+This allows the browser to display the processed live camera stream.
 
-is_bottleneck
-bottleneck_reason
-Risk Engine
+Backend Connection
 
-The risk engine combines crowd-related metrics to calculate a risk result.
-
-The current result contains:
-
-risk_score
-risk_level
-components
-
-Example:
-
-{
-  "risk_score": 0.01,
-  "risk_level": "safe"
-}
-
-The risk calculation considers factors including:
-
-Crowd density
-Crowd flow
-Movement velocity
-Bottleneck conditions
-People count
-Backend API
-
-The FastAPI backend provides APIs for video analysis and live CCTV monitoring.
-
-The backend runs on:
+The frontend currently communicates with the backend running at:
 
 http://localhost:8000
 
-FastAPI Swagger documentation:
+Examples of backend endpoints used by the frontend:
 
-http://localhost:8000/docs
-Live CCTV API
-Start Camera
+GET  /api/live/status
+GET  /api/live/stream
 POST /api/live/start
-
-Example:
-
-http://localhost:8000/api/live/start?source=0&camera_id=camera_1
-
-Where:
-
-source=0
-
-represents the default webcam.
-
-Stop Camera
 POST /api/live/stop
-Live Status
-GET /api/live/status
 
-The status endpoint provides:
+The backend must be running for live monitoring and video processing features to work.
 
-{
-  "camera_id": "camera_1",
-  "running": true,
-  "connected": true,
-  "frame_number": 100,
-  "unique_track_count": 3,
-  "metrics": {
-    "people_count": 3,
-    "density": 0.012,
-    "flow_metrics": {},
-    "is_bottleneck": false,
-    "bottleneck_reason": "",
-    "risk_result": {}
-  }
-}
-Frontend Live CCTV Dashboard
-
-The Live CCTV page is available at:
-
-http://localhost:3000/cctv
-
-The dashboard currently provides:
-
-Camera Status
-      |
-      +---- Camera Online / Offline
-      |
-      +---- Start Camera
-      |
-      +---- Stop Camera
-
-Live Metrics
-      |
-      +---- People Count
-      |
-      +---- Density
-      |
-      +---- Flow Rate
-      |
-      +---- Average Velocity
-      |
-      +---- Bottleneck Status
-      |
-      +---- Risk Score
-      |
-      +---- Risk Level
-
-The frontend currently retrieves live status information from the backend and updates the displayed metrics in real time.
-
-Getting Started
+Installation
 Prerequisites
 
 Make sure the following are installed:
 
-Python
 Node.js
 npm
-PostgreSQL
-Git
+Backend server
 
-A compatible Python environment is also required for the backend dependencies.
+You can check Node.js and npm using:
+
+node --version
+npm --version
+Setup
+
+Navigate to the frontend directory:
+
+cd frontend
+
+Install dependencies:
+
+npm install
+Run the Development Server
+
+Start the Next.js development server:
+
+npm run dev
+
+The frontend will normally be available at:
+
+http://localhost:3000
+
+Open the address in your browser.
+
+Production Build
+
+To create a production build:
+
+npm run build
+
+To start the production server:
+
+npm start
+Development Workflow
+
+For local development, run both the backend and frontend.
+
+Terminal 1 — Backend
+
+From the backend directory, start the FastAPI server.
+
+The backend normally runs on:
+
+http://localhost:8000
+Terminal 2 — Frontend
+
+From the frontend directory:
+
+npm run dev
+
+The frontend normally runs on:
+
+http://localhost:3000
+Live Webcam Usage
+Start the backend.
+Start the frontend.
+Open:
+http://localhost:3000/cctv
+Select:
+Computer Webcam
+Enter a camera ID if required.
+Click the start button.
+Allow browser/camera access if requested.
+
+The frontend sends:
+
+source = 0
+
+to the backend.
+
+The backend then processes the webcam stream using its live processing pipeline.
+
+Live CCTV / RTSP Usage
+
+When an RTSP-enabled CCTV/IP camera is available:
+
+Open the Live CCTV page.
+Select:
+CCTV / IP Camera
+Enter the camera's RTSP URL.
+Enter the camera ID.
+Start the camera.
+
+The frontend sends the RTSP source to the backend.
+
+Example:
+
+rtsp://username:password@192.168.1.100:554/stream
+
+The exact URL depends on the CCTV/IP camera configuration.
+
+Navigation
+
+The application currently provides navigation for:
+
+CrowdSentinel AI
+
+├── Video Processing
+│
+└── Live CCTV
+
+The navigation is implemented in:
+
+src/app/layout.tsx
+Styling
+
+Global styling is defined in:
+
+src/app/globals.css
+
+The application uses Tailwind CSS for UI styling.
+
+Charts
+
+The frontend uses Recharts for displaying chart-based analysis information.
+
+Recharts is included in the frontend dependencies and can be used for visualizing analysis metrics.
+
+API Communication
+
+The frontend communicates with the FastAPI backend using standard HTTP requests.
+
+Example:
+
+fetch("http://localhost:8000/api/live/status")
+
+For starting live processing:
+
+fetch(
+  `http://localhost:8000/api/live/start?source=${source}&camera_id=${cameraId}`,
+  {
+    method: "POST",
+  }
+);
+Troubleshooting
+Frontend does not start
+
+Make sure dependencies are installed:
+
+npm install
+
+Then run:
+
+npm run dev
+Backend connection error
+
+If the frontend cannot communicate with the backend, make sure the FastAPI server is running on:
+
+http://localhost:8000
+
+You can check the backend health endpoint:
+
+http://localhost:8000/health
+Live camera does not start
+
+Check:
+
+Backend is running.
+The selected camera source is correct.
+Browser camera permissions are allowed for webcam usage.
+The RTSP URL is correct when using an IP camera.
+The camera is accessible from the machine running the backend.
+Live stream is not displayed
+
+Check:
+
+http://localhost:8000/api/live/stream
+
+The backend must have an active live camera stream.
+
+Also verify that the backend live processing has been started from the Live CCTV page.
+
+RTSP Camera Issues
+
+RTSP connectivity can depend on:
+
+Camera configuration
+Username/password
+IP address
+RTSP port
+Network connectivity
+Stream URL
+Camera-supported codec
+
+The frontend only provides the RTSP source to the backend. The actual RTSP connection and video processing are handled by the backend.
+
+Important Files
+File	Purpose
+src/app/page.tsx	Video processing interface
+src/app/cctv/page.tsx	Live webcam/CCTV monitoring interface
+src/app/dashboard/page.tsx	Analysis dashboard
+src/app/analyses/page.tsx	Analysis listing
+src/app/analyses/[id]/page.tsx	Individual analysis view
+src/app/layout.tsx	Application layout and navigation
+src/app/globals.css	Global styling
+package.json	Frontend dependencies and scripts
+next.config.ts	Next.js configuration
+tsconfig.json	TypeScript configuration
+Frontend Responsibilities
+
+The frontend is responsible for:
+
+Providing the user interface
+Video upload interaction
+Starting and stopping live monitoring
+Selecting webcam or CCTV/IP camera
+Sending camera source information to the backend
+Displaying the live camera stream
+Polling live status
+Displaying crowd metrics
+Displaying analysis information
+Providing navigation between application sections
+
+The AI detection, tracking, crowd analytics, risk calculation, and video processing are handled by the backend.
