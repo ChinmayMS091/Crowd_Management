@@ -1,6 +1,6 @@
-# CrowdSentinel AI — Backend
+# Crowd Management AI — Backend
 
-This directory contains the backend application for **CrowdSentinel AI**.
+This directory contains the backend application for **Crowd Management AI**.
 
 The backend provides the API and AI processing pipeline for:
 
