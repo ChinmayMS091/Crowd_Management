@@ -1,6 +1,6 @@
-# CrowdSentinel AI — Frontend
+# Crowd Management AI — Frontend
 
-This directory contains the frontend application for **CrowdSentinel AI**, a crowd monitoring and analysis system.
+This directory contains the frontend application for **Crowd Management AI**, a crowd monitoring and analysis system.
 
 The frontend is built with **Next.js, React, TypeScript, Tailwind CSS, and Recharts**. It provides the user interface for video processing, analysis results, and live CCTV/webcam monitoring.
 
@@ -248,7 +248,7 @@ Navigation
 
 The application currently provides navigation for:
 
-CrowdSentinel AI
+Crowd Management AI
 
 ├── Video Processing
 │
