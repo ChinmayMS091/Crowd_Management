@@ -2,7 +2,7 @@
 CrowdSentinel AI Backend
 FastAPI server for video processing and AI analysis
 """
-
+from api.live import router as live_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -61,6 +61,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(live_router)
 app.include_router(videos_router)
 app.include_router(analysis_router)
 

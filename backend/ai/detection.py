@@ -5,12 +5,18 @@ Uses Ultralytics YOLOv8 for real-time person detection
 
 import cv2
 import numpy as np
+
 from ultralytics import YOLO
+
 from typing import List, Tuple, Optional
+
 import logging
+
 from config import settings
 
+
 logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,35 +24,83 @@ class PersonDetector:
     """
     YOLO-based person detector
     """
-    
+
     PERSON_CLASS_ID = 0  # COCO dataset: 0 = person
-    
-    def __init__(self, model_path: Optional[str] = None):
+
+    def __init__(
+        self,
+        model_path: Optional[str] = None,
+        confidence_threshold: Optional[float] = None
+    ):
         """
-        Initialize the YOLO model
-        
+        Initialize the YOLO model.
+
         Args:
-            model_path: Path to YOLO model file. If None, uses default from settings
+            model_path:
+                Path to YOLO model file.
+                If None, uses default from settings.
+
+            confidence_threshold:
+                Optional custom confidence threshold.
+
+                If None:
+                Uses settings.yolo_confidence_threshold.
+
+                This allows live CCTV to use a stricter
+                threshold without changing the existing
+                recorded-video pipeline.
         """
-        self.model_path = model_path or settings.yolo_model_path
-        self.confidence_threshold = settings.yolo_confidence_threshold
+
+        self.model_path = (
+            model_path or settings.yolo_model_path
+        )
+
+        # Use custom threshold if provided.
+        # Otherwise preserve the existing project setting.
+        self.confidence_threshold = (
+            confidence_threshold
+            if confidence_threshold is not None
+            else settings.yolo_confidence_threshold
+        )
+
         self.iou_threshold = settings.yolo_iou_threshold
+
         self.model = None
+
         self._load_model()
-    
+
     def _load_model(self):
         """Load the YOLO model"""
+
         try:
-            logger.info(f"Loading YOLO model from {self.model_path}")
+
+            logger.info(
+                f"Loading YOLO model from {self.model_path}"
+            )
+
             self.model = YOLO(self.model_path)
-            logger.info("YOLO model loaded successfully")
+
+            logger.info(
+                "YOLO model loaded successfully"
+            )
+
         except Exception as e:
-            logger.error(f"Failed to load YOLO model: {e}")
-            # Fallback to downloading default model
-            logger.info("Attempting to download default YOLOv8n model...")
+
+            logger.error(
+                f"Failed to load YOLO model: {e}"
+            )
+
+            # Fallback to downloading default YOLOv8n model
+            logger.info(
+                "Attempting to download default YOLOv8n model..."
+            )
+
             self.model = YOLO("yolov8n.pt")
-            logger.info("Default YOLOv8n model loaded")
-    
+
+            logger.info(
+                "Default YOLOv8n model loaded"
+            )
+
     def detect_frame(
         self,
         frame: np.ndarray,
@@ -61,17 +115,25 @@ class PersonDetector:
         """
 
         if self.model is None:
-            logger.error("Model not loaded")
+
+            logger.error(
+                "Model not loaded"
+            )
+
             return []
 
         try:
+
             height, width = frame.shape[:2]
 
             # ---------------------------------------------------------
             # Decide whether tiling is needed
             # ---------------------------------------------------------
 
-            use_tiling = width >= 1600 or height >= 900
+            use_tiling = (
+                width >= 1600 or
+                height >= 900
+            )
 
             # ---------------------------------------------------------
             # NORMAL FULL-FRAME DETECTION
@@ -89,7 +151,9 @@ class PersonDetector:
                     classes=[self.PERSON_CLASS_ID]
                 )
 
-                detections = self._extract_detections(results)
+                detections = self._extract_detections(
+                    results
+                )
 
                 logger.info(
                     f"Frame {frame_number}: "
@@ -102,27 +166,43 @@ class PersonDetector:
             # ADAPTIVE TILED DETECTION
             # ---------------------------------------------------------
 
-            target_tile_width = min(1280, width)
-            target_tile_height = min(720, height)
+            target_tile_width = min(
+                1280,
+                width
+            )
+
+            target_tile_height = min(
+                720,
+                height
+            )
 
             # 20% overlap between neighboring tiles
             overlap = 0.20
 
             step_x = max(
                 1,
-                int(target_tile_width * (1 - overlap))
+                int(
+                    target_tile_width *
+                    (1 - overlap)
+                )
             )
 
             step_y = max(
                 1,
-                int(target_tile_height * (1 - overlap))
+                int(
+                    target_tile_height *
+                    (1 - overlap)
+                )
             )
 
             # X positions
             x_positions = list(
                 range(
                     0,
-                    max(1, width - target_tile_width + 1),
+                    max(
+                        1,
+                        width - target_tile_width + 1
+                    ),
                     step_x
                 )
             )
@@ -134,13 +214,19 @@ class PersonDetector:
             )
 
             if last_x not in x_positions:
-                x_positions.append(last_x)
+
+                x_positions.append(
+                    last_x
+                )
 
             # Y positions
             y_positions = list(
                 range(
                     0,
-                    max(1, height - target_tile_height + 1),
+                    max(
+                        1,
+                        height - target_tile_height + 1
+                    ),
                     step_y
                 )
             )
@@ -152,7 +238,10 @@ class PersonDetector:
             )
 
             if last_y not in y_positions:
-                y_positions.append(last_y)
+
+                y_positions.append(
+                    last_y
+                )
 
             all_detections = []
 
@@ -174,7 +263,10 @@ class PersonDetector:
                         height
                     )
 
-                    tile = frame[y1:y2, x1:x2]
+                    tile = frame[
+                        y1:y2,
+                        x1:x2
+                    ]
 
                     if tile.size == 0:
                         continue
@@ -189,8 +281,10 @@ class PersonDetector:
                         classes=[self.PERSON_CLASS_ID]
                     )
 
-                    tile_detections = self._extract_detections(
-                        results
+                    tile_detections = (
+                        self._extract_detections(
+                            results
+                        )
                     )
 
                     # Convert tile coordinates to
@@ -208,15 +302,19 @@ class PersonDetector:
                             by2 + y1
                         ]
 
-                        all_detections.append(detection)
+                        all_detections.append(
+                            detection
+                        )
 
             # ---------------------------------------------------------
             # Remove duplicates caused by tile overlap
             # ---------------------------------------------------------
 
-            detections = self._remove_duplicate_detections(
-                all_detections,
-                iou_threshold=0.45
+            detections = (
+                self._remove_duplicate_detections(
+                    all_detections,
+                    iou_threshold=0.45
+                )
             )
 
             logger.info(
@@ -235,6 +333,7 @@ class PersonDetector:
             )
 
             return []
+
     def _extract_detections(
         self,
         results
@@ -269,7 +368,9 @@ class PersonDetector:
 
                 detections.append({
                     "class_id": class_id,
-                    "class_name": self.model.names[class_id],
+                    "class_name": self.model.names[
+                        class_id
+                    ],
                     "confidence": confidence,
                     "bbox": [
                         float(x1),
@@ -280,7 +381,6 @@ class PersonDetector:
                 })
 
         return detections
-
 
     def _remove_duplicate_detections(
         self,
@@ -316,14 +416,18 @@ class PersonDetector:
                 )
 
                 if iou >= iou_threshold:
+
                     duplicate = True
+
                     break
 
             if not duplicate:
-                kept.append(detection)
+
+                kept.append(
+                    detection
+                )
 
         return kept
-
 
     def _calculate_iou(
         self,
@@ -334,11 +438,25 @@ class PersonDetector:
         Calculate Intersection over Union.
         """
 
-        x1 = max(box1[0], box2[0])
-        y1 = max(box1[1], box2[1])
+        x1 = max(
+            box1[0],
+            box2[0]
+        )
 
-        x2 = min(box1[2], box2[2])
-        y2 = min(box1[3], box2[3])
+        y1 = max(
+            box1[1],
+            box2[1]
+        )
+
+        x2 = min(
+            box1[2],
+            box2[2]
+        )
+
+        y2 = min(
+            box1[3],
+            box2[3]
+        )
 
         intersection_width = max(
             0.0,
@@ -356,49 +474,82 @@ class PersonDetector:
         )
 
         area1 = (
-            max(0.0, box1[2] - box1[0]) *
-            max(0.0, box1[3] - box1[1])
+            max(
+                0.0,
+                box1[2] - box1[0]
+            ) *
+            max(
+                0.0,
+                box1[3] - box1[1]
+            )
         )
 
         area2 = (
-            max(0.0, box2[2] - box2[0]) *
-            max(0.0, box2[3] - box2[1])
+            max(
+                0.0,
+                box2[2] - box2[0]
+            ) *
+            max(
+                0.0,
+                box2[3] - box2[1]
+            )
         )
 
-        union = area1 + area2 - intersection
+        union = (
+            area1 +
+            area2 -
+            intersection
+        )
 
         if union <= 0:
+
             return 0.0
 
         return intersection / union
+
     def detect_batch(
         self,
         frames: List[np.ndarray],
         start_frame: int = 0
     ) -> List[List[dict]]:
         """
-        Detect persons in a batch of frames
-        
+        Detect persons in a batch of frames.
+
         Args:
-            frames: List of input frames
-            start_frame: Starting frame number
-            
+            frames:
+                List of input frames.
+
+            start_frame:
+                Starting frame number.
+
         Returns:
-            List of detection lists, one per frame
+            List of detection lists, one per frame.
         """
+
         all_detections = []
-        
+
         for i, frame in enumerate(frames):
-            detections = self.detect_frame(frame, start_frame + i)
-            all_detections.append(detections)
-        
+
+            detections = self.detect_frame(
+                frame,
+                start_frame + i
+            )
+
+            all_detections.append(
+                detections
+            )
+
         return all_detections
-    
+
     def get_model_info(self) -> dict:
         """Get information about the loaded model"""
+
         if self.model is None:
-            return {"status": "not_loaded"}
-        
+
+            return {
+                "status": "not_loaded"
+            }
+
         return {
             "status": "loaded",
             "model_path": self.model_path,
