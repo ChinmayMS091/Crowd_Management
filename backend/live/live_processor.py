@@ -42,16 +42,15 @@ class LiveProcessor:
         Risk Engine
     """
 
-    def __init__(self):
+    def __init__(self, detector: PersonDetector):
         """Initialize live processing components."""
 
         # ---------------------------------------------------------
         # AI Components
         # ---------------------------------------------------------
 
-        self.detector = PersonDetector(
-            confidence_threshold=0.50
-        )
+        # Shared YOLO detector supplied by the application
+        self.detector = detector
 
         self.tracker = SimpleTracker()
         self.analytics: Optional[CrowdAnalytics] = None

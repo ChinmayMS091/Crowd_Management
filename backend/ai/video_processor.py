@@ -25,9 +25,9 @@ class VideoProcessor:
     Main video processing pipeline
     """
     
-    def __init__(self):
+    def __init__(self, detector=None):
         """Initialize all processing components"""
-        self.detector = PersonDetector()
+        self.detector = detector or PersonDetector()
         self.tracker = SimpleTracker()
         self.analytics = None
         self.risk_engine = RiskEngine()

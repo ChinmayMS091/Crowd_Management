@@ -37,6 +37,7 @@ from schemas import (
 
 from ai.video_processor import VideoProcessor
 from ai.risk_engine import RiskEngine
+from ai.shared_detector import shared_detector
 from config import settings
 
 
@@ -63,7 +64,9 @@ router = APIRouter(
 
 # Global processor instance
 # In production, use a worker/pool.
-processor = VideoProcessor()
+processor = VideoProcessor(
+    detector=shared_detector
+)
 
 risk_engine = RiskEngine()
 

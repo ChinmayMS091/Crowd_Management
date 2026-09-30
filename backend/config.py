@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     
     # AI Model Configuration
     yolo_model_path: str = "models/yolov8m.pt"
-    yolo_confidence_threshold: float = 0.15
+    yolo_confidence_threshold: float = 0.10
     yolo_iou_threshold: float = 0.50
     
     # Video Processing

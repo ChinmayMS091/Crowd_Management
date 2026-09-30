@@ -12,6 +12,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from live.live_processor import LiveProcessor
+from ai.shared_detector import shared_detector
 
 
 router = APIRouter(
@@ -20,11 +21,14 @@ router = APIRouter(
 )
 
 
+
 # ---------------------------------------------------------
 # Live processor
 # ---------------------------------------------------------
 
-live_processor = LiveProcessor()
+live_processor = LiveProcessor(
+    detector=shared_detector
+)
 
 # Background task for continuous stream processing
 live_task = None

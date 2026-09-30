@@ -1,5 +1,5 @@
 """
-CrowdSentinel AI Backend
+Crowd Management AI Backend
 FastAPI server for video processing and AI analysis
 """
 from api.live import router as live_router
@@ -10,7 +10,7 @@ import logging
 
 from api.videos import router as videos_router
 from api.analysis import router as analysis_router
-from ai.detection import PersonDetector
+from ai.shared_detector import shared_detector
 from database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events"""
-    logger.info("Starting CrowdSentinel AI Backend")
+    logger.info("Starting Crowd Management AI Backend")
 
     # Initialize database
     try:
@@ -30,23 +30,16 @@ async def lifespan(app: FastAPI):
         logger.error(f"Database initialization failed: {e}")
         raise
 
-    # Initialize YOLO model on startup
-    
-    # Initialize YOLO model on startup
-    try:
-        detector = PersonDetector()
-        logger.info("YOLO model initialized successfully")
-        app.state.detector = detector
-    except Exception as e:
-        logger.warning(f"YOLO model initialization failed: {e}")
-        app.state.detector = None
+    # Shared YOLO detector is initialized when ai.shared_detector is imported
+    app.state.detector = shared_detector
+    logger.info("Shared YOLO model initialized successfully")
     
     yield
-    logger.info("Shutting down CrowdSentinel AI Backend")
+    logger.info("Shutting down Crowd Management AI Backend")
 
 
 app = FastAPI(
-    title="CrowdSentinel AI",
+    title="Crowd Management AI",
     description="AI-powered early crowd-risk monitoring and decision-support system",
     version="0.1.0",
     lifespan=lifespan
@@ -71,7 +64,7 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "CrowdSentinel AI Backend",
+        "service": "Crowd Management AI Backend",
         "version": "0.1.0"
     }
 
