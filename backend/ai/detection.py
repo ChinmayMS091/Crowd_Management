@@ -167,12 +167,12 @@ class PersonDetector:
             # ---------------------------------------------------------
 
             target_tile_width = min(
-                1280,
+                960,
                 width
             )
 
             target_tile_height = min(
-                720,
+                540,
                 height
             )
 
