@@ -39,6 +39,7 @@ interface Alert {
 }
 
 export default function DashboardPage() {
+  const [liveStatus, setLiveStatus] = useState<any>(null);
   const [latestAnalysis, setLatestAnalysis] = useState<Analysis | null>(null);
   const [metrics, setMetrics] = useState<AnalysisMetric[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -59,14 +60,14 @@ export default function DashboardPage() {
         if (completed.length > 0) {
           const latest = completed[0];
           setLatestAnalysis(latest);
-          
+
           // Fetch metrics for this analysis
           const metricsRes = await fetch(`http://localhost:8000/api/analysis/${latest.id}/metrics`);
           if (metricsRes.ok) {
             const metricsData = await metricsRes.json();
             setMetrics(metricsData);
           }
-          
+
           // Fetch alerts for this analysis
           const alertsRes = await fetch(`http://localhost:8000/api/analysis/${latest.id}/alerts`);
           if (alertsRes.ok) {
@@ -248,8 +249,8 @@ export default function DashboardPage() {
                 {metrics.slice(-50).map((metric) => {
                   const height = (metric.risk_score / 100) * 100;
                   const color = metric.risk_score >= 76 ? 'bg-red-600' :
-                               metric.risk_score >= 56 ? 'bg-orange-600' :
-                               metric.risk_score >= 31 ? 'bg-yellow-600' : 'bg-green-600';
+                    metric.risk_score >= 56 ? 'bg-orange-600' :
+                      metric.risk_score >= 31 ? 'bg-yellow-600' : 'bg-green-600';
                   return (
                     <div
                       key={metric.id}
@@ -278,9 +279,9 @@ export default function DashboardPage() {
                 <div className="text-slate-400 text-sm">Overall Risk Level</div>
                 <div className={`font-semibold ${getRiskLevelColor(latestAnalysis.max_risk_score)}`}>
                   {latestAnalysis.max_risk_score === null ? 'N/A' :
-                   latestAnalysis.max_risk_score >= 76 ? 'CRITICAL' :
-                   latestAnalysis.max_risk_score >= 56 ? 'HIGH' :
-                   latestAnalysis.max_risk_score >= 31 ? 'WARNING' : 'SAFE'}
+                    latestAnalysis.max_risk_score >= 76 ? 'CRITICAL' :
+                      latestAnalysis.max_risk_score >= 56 ? 'HIGH' :
+                        latestAnalysis.max_risk_score >= 31 ? 'WARNING' : 'SAFE'}
                 </div>
               </div>
             </div>
