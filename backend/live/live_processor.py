@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import asyncio
 import logging
+import time
 
 from typing import AsyncGenerator, Dict, Optional, Union
 
@@ -76,6 +77,18 @@ class LiveProcessor:
         self.camera_id = None
         self.frame_number = 0
 
+        # Live performance measurements
+        self.processing_fps = 0.0
+        self.frame_latency_ms = 0.0
+        self.fps_start_time = None
+        self.fps_frame_count = 0
+
+        # Live stage timing measurements
+        self.detection_time_ms = 0.0
+        self.tracking_time_ms = 0.0
+        self.analytics_time_ms = 0.0
+        self.risk_time_ms = 0.0
+
         # ---------------------------------------------------------
         # Latest processed result
         # Used by API / WebSocket
@@ -109,6 +122,18 @@ class LiveProcessor:
         self.unique_track_ids.clear()
         self.latest_result = None
         self.latest_frame = None
+
+        # Reset performance measurements
+        self.processing_fps = 0.0
+        self.frame_latency_ms = 0.0
+        self.fps_start_time = time.perf_counter()
+        self.fps_frame_count = 0
+
+        # Reset stage timing measurements
+        self.detection_time_ms = 0.0
+        self.tracking_time_ms = 0.0
+        self.analytics_time_ms = 0.0
+        self.risk_time_ms = 0.0
 
         # ---------------------------------------------------------
         # Open camera / RTSP stream
@@ -235,6 +260,8 @@ class LiveProcessor:
                 # Process frame
                 # -------------------------------------------------
 
+                process_start = time.perf_counter()
+
                 result = await self._process_frame(
                     frame=frame,
                     frame_number=self.frame_number,
@@ -244,12 +271,38 @@ class LiveProcessor:
                     detection_interval=detection_interval,
                 )
 
+                process_time = time.perf_counter() - process_start
+
+                # Frame processing latency
+                self.frame_latency_ms = process_time * 1000
+
+                # -------------------------------------------------
+                # Rolling / end-to-end FPS
+                # -------------------------------------------------
+
+                self.fps_frame_count += 1
+
+                elapsed_time = time.perf_counter() - self.fps_start_time
+
+                if elapsed_time > 0:
+                    self.processing_fps = (
+                        self.fps_frame_count / elapsed_time
+                    )
+
                 # -------------------------------------------------
                 # Add live-specific information
                 # -------------------------------------------------
 
                 result["camera_id"] = camera_id
                 result["stream_status"] = "online"
+
+                result["processing_fps"] = round(
+                    self.processing_fps, 2
+                )
+
+                result["frame_latency_ms"] = round(
+                    self.frame_latency_ms, 2
+                )
 
                 # -------------------------------------------------
                 # Store latest result
@@ -338,10 +391,16 @@ class LiveProcessor:
 
         if run_detection:
 
+            detection_start = time.perf_counter()
+
             detections = self.detector.detect_frame(
                 frame,
                 frame_number
             )
+
+            self.detection_time_ms = (
+                time.perf_counter() - detection_start
+            ) * 1000
 
         else:
 
@@ -351,11 +410,17 @@ class LiveProcessor:
         # Person Tracking
         # ---------------------------------------------------------
 
+        tracking_start = time.perf_counter()
+
         tracks = self.tracker.update(
             detections,
             frame_number,
             detections_available=run_detection
         )
+
+        self.tracking_time_ms = (
+            time.perf_counter() - tracking_start
+        ) * 1000
 
         # ---------------------------------------------------------
         # People Count
@@ -376,6 +441,8 @@ class LiveProcessor:
         # ---------------------------------------------------------
         # Crowd Density
         # ---------------------------------------------------------
+
+        analytics_start = time.perf_counter()
 
         density = self.analytics.calculate_density(
             tracks
@@ -401,9 +468,15 @@ class LiveProcessor:
             flow_metrics
         )
 
+        self.analytics_time_ms = (
+            time.perf_counter() - analytics_start
+        ) * 1000
+
         # ---------------------------------------------------------
         # Risk Calculation
         # ---------------------------------------------------------
+
+        risk_start = time.perf_counter()
 
         risk_result = self.risk_engine.calculate_risk(
             density,
@@ -411,6 +484,10 @@ class LiveProcessor:
             is_bottleneck,
             people_count=people_count
         )
+
+        self.risk_time_ms = (
+            time.perf_counter() - risk_start
+        ) * 1000
 
         # ---------------------------------------------------------
         # Return result
@@ -432,6 +509,20 @@ class LiveProcessor:
             "bottleneck_reason": bottleneck_reason,
 
             "risk_result": risk_result,
+
+            # Live stage performance measurements
+            "detection_time_ms": round(
+                self.detection_time_ms, 2
+            ),
+            "tracking_time_ms": round(
+                self.tracking_time_ms, 2
+            ),
+            "analytics_time_ms": round(
+                self.analytics_time_ms, 2
+            ),
+            "risk_time_ms": round(
+                self.risk_time_ms, 2
+            ),
 
             "unique_track_count": len(
                 self.unique_track_ids
@@ -461,6 +552,28 @@ class LiveProcessor:
             "frame_number": self.frame_number,
             "unique_track_count": len(
                 self.unique_track_ids
+            ),
+
+            # Live performance measurements
+            "processing_fps": round(
+                self.processing_fps, 2
+            ),
+            "frame_latency_ms": round(
+                self.frame_latency_ms, 2
+            ),
+
+            # Live stage performance measurements
+            "detection_time_ms": round(
+                self.detection_time_ms, 2
+            ),
+            "tracking_time_ms": round(
+                self.tracking_time_ms, 2
+            ),
+            "analytics_time_ms": round(
+                self.analytics_time_ms, 2
+            ),
+            "risk_time_ms": round(
+                self.risk_time_ms, 2
             ),
         }
 
