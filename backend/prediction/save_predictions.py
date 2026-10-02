@@ -46,6 +46,12 @@ def save_predictions(forecast_df):
                 model_version
             )
             VALUES %s
+            ON CONFLICT (sensor_id, forecast_time)
+            DO UPDATE SET
+                predicted_people = EXCLUDED.predicted_people,
+                model_name = EXCLUDED.model_name,
+                model_version = EXCLUDED.model_version,
+                created_at = NOW()
             """,
             rows,
             page_size=1000,
@@ -57,7 +63,7 @@ def save_predictions(forecast_df):
         print("PREDICTIONS SAVED")
         print("========================================")
 
-        print(f"Rows inserted: {len(rows):,}")
+        print(f"Rows processed: {len(rows):,}")
 
     except Exception:
         connection.rollback()

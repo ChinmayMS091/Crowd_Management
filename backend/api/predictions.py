@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from datetime import date
+from fastapi import APIRouter, Query
 import psycopg2
 
 router = APIRouter(
@@ -14,6 +15,18 @@ DB_CONFIG = {
     "password": "crowdflow123",
     "port": 5432,
 }
+
+
+def get_crowd_level(predicted_people: float) -> str:
+
+    if predicted_people <= 100:
+        return "Low"
+    elif predicted_people <= 300:
+        return "Moderate"
+    elif predicted_people <= 500:
+        return "High"
+    else:
+        return "Very High"
 
 
 @router.get("")
@@ -37,27 +50,21 @@ async def get_predictions():
             FROM crowd_predictions cp
             JOIN prediction_sensors ps
                 ON ps.id = cp.sensor_id
-            ORDER BY
-                ps.sensor_code,
-                cp.forecast_time;
-            """
+            WHERE
+                cp.sensor_id = %s
+                AND cp.forecast_time >= %s
+            ORDER BY cp.forecast_time
+            LIMIT 24;
+            """,
+            (sensor_id, forecast_date)
         )
-
         rows = cursor.fetchall()
 
         predictions = []
 
         for row in rows:
-            predicted_people = float(row[4])
 
-            if predicted_people <= 100:
-                crowd_level = "Low"
-            elif predicted_people <= 300:
-                crowd_level = "Moderate"
-            elif predicted_people <= 500:
-                crowd_level = "High"
-            else:
-                crowd_level = "Very High"
+            predicted_people = float(row[4])
 
             predictions.append(
                 {
@@ -66,7 +73,7 @@ async def get_predictions():
                     "location_type": row[2],
                     "forecast_time": row[3],
                     "predicted_people": predicted_people,
-                    "crowd_level": crowd_level,
+                    "crowd_level": get_crowd_level(predicted_people),
                     "model_name": row[5],
                     "model_version": row[6],
                 }
@@ -83,7 +90,8 @@ async def get_predictions():
 
 
 @router.get("/sensors")
-async def get_history_sensors():
+async def get_prediction_sensors():
+
     connection = psycopg2.connect(**DB_CONFIG)
 
     try:
@@ -123,3 +131,132 @@ async def get_history_sensors():
     finally:
         cursor.close()
         connection.close()
+
+
+@router.get("/dates")
+async def get_prediction_dates(
+    sensor_id: int = Query(..., description="Prediction sensor ID")
+):
+
+    connection = psycopg2.connect(**DB_CONFIG)
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT DISTINCT
+                forecast_time::date AS forecast_date
+            FROM crowd_predictions
+            WHERE sensor_id = %s
+            ORDER BY forecast_date;
+            """,
+            (sensor_id,)
+        )
+
+        rows = cursor.fetchall()
+
+        dates = [
+            row[0].isoformat()
+            for row in rows
+        ]
+
+        return {
+            "sensor_id": sensor_id,
+            "total_dates": len(dates),
+            "dates": dates,
+        }
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@router.get("/forecast")
+async def get_prediction_forecast(
+    sensor_id: int = Query(..., description="Prediction sensor ID"),
+    forecast_date: date = Query(..., description="Forecast start date")
+):
+
+    connection = psycopg2.connect(**DB_CONFIG)
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            WITH forecast_start AS (
+                SELECT MIN(cp.forecast_time) AS start_time
+                FROM crowd_predictions cp
+                WHERE
+                    cp.sensor_id = %s
+                    AND cp.forecast_time::date = %s
+            )
+            SELECT
+                ps.sensor_code,
+                ps.location_name,
+                ps.location_type,
+                cp.forecast_time,
+                cp.predicted_people,
+                cp.model_name,
+                cp.model_version
+            FROM crowd_predictions cp
+            JOIN prediction_sensors ps
+                ON ps.id = cp.sensor_id
+            CROSS JOIN forecast_start fs
+            WHERE
+                cp.sensor_id = %s
+                AND fs.start_time IS NOT NULL
+                AND cp.forecast_time >= fs.start_time
+            ORDER BY cp.forecast_time
+            LIMIT 24;
+            """,
+            (sensor_id, forecast_date, sensor_id)
+        )
+
+        rows = cursor.fetchall()
+
+        predictions = []
+
+        for row in rows:
+
+            predicted_people = float(row[4])
+
+            predictions.append(
+                {
+                    "sensor_code": row[0],
+                    "location_name": row[1],
+                    "location_type": row[2],
+                    "forecast_time": row[3],
+                    "predicted_people": predicted_people,
+                    "crowd_level": get_crowd_level(predicted_people),
+                    "model_name": row[5],
+                    "model_version": row[6],
+                }
+            )
+
+        return {
+            "sensor_id": sensor_id,
+            "forecast_date": forecast_date.isoformat(),
+            "total_predictions": len(predictions),
+            "predictions": predictions,
+        }
+
+    finally:
+        cursor.close()
+        connection.close()
+
+@router.get("/evaluation")
+async def get_evaluation_metrics():
+
+    return {
+        "model_name": "XGBoost",
+        "model_version": "1.0",
+        "metrics": {
+            "mae": 69.16,
+            "rmse": 152.79,
+            "r2": 0.9508,
+        },
+        "test_samples": 468179,
+        "sensors": 66,
+    }

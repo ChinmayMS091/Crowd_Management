@@ -137,6 +137,7 @@ def forecast_sensor(
 
     return predictions
 def generate_forecast():
+
     print("Loading historical data...")
 
     history = load_all_history()
@@ -148,27 +149,9 @@ def generate_forecast():
 
     model = load_model()
 
-    latest_timestamp = history["timestamp"].max()
-
-    forecast_start = (
-        latest_timestamp.floor("h")
-        + pd.Timedelta(hours=1)
-    )
-
-    forecast_end = (
-        forecast_start
-        + pd.Timedelta(hours=23)
-    )
-
     print("\n========================================")
-    print("FORECAST WINDOW")
+    print("FORECAST GENERATION")
     print("========================================")
-
-    print(f"Latest historical timestamp: {latest_timestamp}")
-    print(f"Forecast start:              {forecast_start}")
-    print(f"Forecast end:                {forecast_end}")
-
-    print("\nGenerating 24-hour forecast for 66 sensors...")
 
     all_predictions = []
 
@@ -186,6 +169,32 @@ def generate_forecast():
         sensor_id = row.sensor_id
         sensor_code = row.sensor_code
 
+        # Get this sensor's historical data
+        sensor_history = (
+            history[
+                history["sensor_id"] == sensor_id
+            ]
+            .sort_values("timestamp")
+        )
+
+        # Find the latest timestamp available
+        # specifically for this sensor
+        latest_timestamp = sensor_history[
+            "timestamp"
+        ].iloc[-1]
+
+        # Forecast starts one hour after
+        # this sensor's latest observation
+        forecast_start = (
+            latest_timestamp.floor("h")
+            + pd.Timedelta(hours=1)
+        )
+
+        forecast_end = (
+            forecast_start
+            + pd.Timedelta(hours=23)
+        )
+
         predictions = forecast_sensor(
             model=model,
             history=history,
@@ -198,7 +207,10 @@ def generate_forecast():
 
         print(
             f"[{index:02d}/{len(sensors)}] "
-            f"{sensor_code}: {len(predictions)} predictions"
+            f"{sensor_code}: "
+            f"last={latest_timestamp} | "
+            f"forecast={forecast_start} → {forecast_end} | "
+            f"{len(predictions)} predictions"
         )
 
     forecast_df = pd.DataFrame(all_predictions)
