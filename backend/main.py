@@ -3,7 +3,9 @@ Crowd Management AI Backend
 FastAPI server for video processing and AI analysis
 """
 from api.live import router as live_router
+from api.predictions import router as predictions_router    
 from fastapi import FastAPI
+from api.history import router as history_router
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -54,6 +56,8 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(history_router)
+app.include_router(predictions_router)
 app.include_router(live_router)
 app.include_router(videos_router)
 app.include_router(analysis_router)
