@@ -12,8 +12,11 @@ import numpy as np
 import asyncio
 import logging
 import time
+import psycopg2
 
 from typing import AsyncGenerator, Dict, Optional, Union
+
+from config import settings
 
 from ai.detection import PersonDetector
 from ai.tracking import SimpleTracker
@@ -52,6 +55,9 @@ class LiveProcessor:
 
         # Shared YOLO detector supplied by the application
         self.detector = detector
+
+        self.history_save_interval = 60.0
+        self.last_history_save_time = 0.0
 
         self.tracker = SimpleTracker()
         self.analytics: Optional[CrowdAnalytics] = None
@@ -105,9 +111,10 @@ class LiveProcessor:
 
     async def process_stream(
         self,
-        source: Union[str, int],
-        camera_id: Optional[str] = None,
-        detection_interval: int = 5,
+        source: str,
+        camera_id: str,
+        sensor_id: int,
+        detection_interval: int = 5
     ) -> AsyncGenerator[Dict, None]:
         """
         Process a live webcam / RTSP stream.
@@ -122,6 +129,9 @@ class LiveProcessor:
         self.unique_track_ids.clear()
         self.latest_result = None
         self.latest_frame = None
+
+        # Reset history timer
+        self.last_history_save_time = 0.0
 
         # Reset performance measurements
         self.processing_fps = 0.0
@@ -269,6 +279,7 @@ class LiveProcessor:
                     width=width,
                     height=height,
                     detection_interval=detection_interval,
+                    sensor_id=sensor_id,
                 )
 
                 process_time = time.perf_counter() - process_start
@@ -282,11 +293,16 @@ class LiveProcessor:
 
                 self.fps_frame_count += 1
 
-                elapsed_time = time.perf_counter() - self.fps_start_time
+                elapsed_time = (
+                    time.perf_counter()
+                    - self.fps_start_time
+                )
 
                 if elapsed_time > 0:
+
                     self.processing_fps = (
-                        self.fps_frame_count / elapsed_time
+                        self.fps_frame_count
+                        / elapsed_time
                     )
 
                 # -------------------------------------------------
@@ -294,6 +310,7 @@ class LiveProcessor:
                 # -------------------------------------------------
 
                 result["camera_id"] = camera_id
+                result["sensor_id"] = sensor_id
                 result["stream_status"] = "online"
 
                 result["processing_fps"] = round(
@@ -363,6 +380,7 @@ class LiveProcessor:
         width: int,
         height: int,
         detection_interval: int = 5,
+        sensor_id: int = 0,
     ) -> Dict:
         """
         Process one live frame.
@@ -427,6 +445,20 @@ class LiveProcessor:
         # ---------------------------------------------------------
 
         people_count = len(tracks)
+
+        current_time = time.time()
+
+        if (
+            current_time - self.last_history_save_time
+            >= self.history_save_interval
+        ):
+
+            await self.save_crowd_history(
+                sensor_id=sensor_id,
+                people_count=people_count,
+            )
+
+            self.last_history_save_time = current_time
 
         # ---------------------------------------------------------
         # Unique Track IDs
@@ -514,12 +546,15 @@ class LiveProcessor:
             "detection_time_ms": round(
                 self.detection_time_ms, 2
             ),
+
             "tracking_time_ms": round(
                 self.tracking_time_ms, 2
             ),
+
             "analytics_time_ms": round(
                 self.analytics_time_ms, 2
             ),
+
             "risk_time_ms": round(
                 self.risk_time_ms, 2
             ),
@@ -558,6 +593,7 @@ class LiveProcessor:
             "processing_fps": round(
                 self.processing_fps, 2
             ),
+
             "frame_latency_ms": round(
                 self.frame_latency_ms, 2
             ),
@@ -566,12 +602,15 @@ class LiveProcessor:
             "detection_time_ms": round(
                 self.detection_time_ms, 2
             ),
+
             "tracking_time_ms": round(
                 self.tracking_time_ms, 2
             ),
+
             "analytics_time_ms": round(
                 self.analytics_time_ms, 2
             ),
+
             "risk_time_ms": round(
                 self.risk_time_ms, 2
             ),
@@ -584,6 +623,7 @@ class LiveProcessor:
         if self.latest_result:
 
             status["metrics"] = {
+
                 "people_count": self.latest_result.get(
                     "people_count"
                 ),
@@ -610,3 +650,68 @@ class LiveProcessor:
             }
 
         return status
+
+    async def save_crowd_history(
+        self,
+        sensor_id: int,
+        people_count: int,
+    ):
+        """
+        Save the current live crowd count to crowd_history.
+        """
+
+        def insert_history():
+
+            connection = None
+            cursor = None
+
+            try:
+
+                connection = psycopg2.connect(
+                    settings.database_url_sync
+                )
+
+                cursor = connection.cursor()
+
+                cursor.execute(
+                    """
+                    INSERT INTO crowd_history (
+                        sensor_id,
+                        timestamp,
+                        people_count,
+                        source
+                    )
+                    VALUES (
+                        %s,
+                        NOW(),
+                        %s,
+                        %s
+                    )
+                    ON CONFLICT (sensor_id, timestamp)
+                    DO UPDATE SET
+                        people_count = EXCLUDED.people_count
+                    """,
+                    (
+                        sensor_id,
+                        max(0, int(people_count)),
+                        "live_cctv",
+                    ),
+                )
+
+                connection.commit()
+
+            except Exception as e:
+
+                logger.exception(
+                    f"Failed to save crowd history: {e}"
+                )
+
+            finally:
+
+                if cursor:
+                    cursor.close()
+
+                if connection:
+                    connection.close()
+
+        await asyncio.to_thread(insert_history)

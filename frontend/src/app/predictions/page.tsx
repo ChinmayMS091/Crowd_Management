@@ -16,6 +16,8 @@ interface Prediction {
     forecast_time: string;
     predicted_people: number;
     crowd_level: string;
+    future_risk_score: number;
+    future_risk_level: string;
     model_name: string;
     model_version: string;
 }
@@ -88,6 +90,7 @@ export default function PredictionsPage() {
 
         fetchSensors();
     }, []);
+
     useEffect(() => {
         const fetchEvaluation = async () => {
             try {
@@ -137,8 +140,6 @@ export default function PredictionsPage() {
                 setAvailableDates(new Set(dates));
 
                 if (dates.length > 0) {
-                    // Select latest date for which the model
-                    // actually generated a forecast.
                     const latestDate = dates[dates.length - 1];
 
                     setSelectedDate(latestDate);
@@ -299,6 +300,29 @@ export default function PredictionsPage() {
     };
 
     // =========================================================
+    // FUTURE RISK BADGE
+    // =========================================================
+
+    const getRiskBadge = (level: string) => {
+        switch (level) {
+            case "safe":
+                return "bg-green-500/15 text-green-400 border border-green-500/30";
+
+            case "warning":
+                return "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30";
+
+            case "high":
+                return "bg-orange-500/15 text-orange-400 border border-orange-500/30";
+
+            case "critical":
+                return "bg-red-500/15 text-red-400 border border-red-500/30";
+
+            default:
+                return "bg-gray-500/15 text-gray-400 border border-gray-500/30";
+        }
+    };
+
+    // =========================================================
     // FORMAT HOURLY TIME
     // =========================================================
 
@@ -374,6 +398,7 @@ export default function PredictionsPage() {
 
                 {/* LOCATION */}
                 <section className="mb-6 rounded-2xl border border-gray-800 bg-[#11161d] p-5 shadow-xl">
+
                     {/* MODEL EVALUATION */}
                     {evaluation && (
                         <section className="mb-6 rounded-2xl border border-gray-800 bg-[#11161d] p-5 shadow-xl">
@@ -394,9 +419,11 @@ export default function PredictionsPage() {
                                     <p className="text-xs uppercase tracking-wider text-gray-500">
                                         MAE
                                     </p>
+
                                     <p className="mt-2 text-2xl font-bold text-white">
                                         {evaluation.metrics.mae.toFixed(2)}
                                     </p>
+
                                     <p className="mt-1 text-xs text-gray-600">
                                         people
                                     </p>
@@ -406,9 +433,11 @@ export default function PredictionsPage() {
                                     <p className="text-xs uppercase tracking-wider text-gray-500">
                                         RMSE
                                     </p>
+
                                     <p className="mt-2 text-2xl font-bold text-white">
                                         {evaluation.metrics.rmse.toFixed(2)}
                                     </p>
+
                                     <p className="mt-1 text-xs text-gray-600">
                                         people
                                     </p>
@@ -418,6 +447,7 @@ export default function PredictionsPage() {
                                     <p className="text-xs uppercase tracking-wider text-gray-500">
                                         R² Score
                                     </p>
+
                                     <p className="mt-2 text-2xl font-bold text-blue-400">
                                         {(evaluation.metrics.r2 * 100).toFixed(2)}%
                                     </p>
@@ -427,6 +457,7 @@ export default function PredictionsPage() {
                                     <p className="text-xs uppercase tracking-wider text-gray-500">
                                         Test Samples
                                     </p>
+
                                     <p className="mt-2 text-2xl font-bold text-white">
                                         {evaluation.test_samples.toLocaleString()}
                                     </p>
@@ -436,6 +467,7 @@ export default function PredictionsPage() {
                                     <p className="text-xs uppercase tracking-wider text-gray-500">
                                         Sensors
                                     </p>
+
                                     <p className="mt-2 text-2xl font-bold text-white">
                                         {evaluation.sensors}
                                     </p>
@@ -642,9 +674,11 @@ export default function PredictionsPage() {
                         </div>
 
                         <div className="overflow-x-auto">
+
                             <div className="flex min-w-[900px] items-end gap-3">
 
                                 {predictions.map((prediction) => {
+
                                     const maxPrediction =
                                         getMaxPrediction();
 
@@ -702,6 +736,7 @@ export default function PredictionsPage() {
                                 })}
 
                             </div>
+
                         </div>
 
                     </section>
@@ -743,7 +778,7 @@ export default function PredictionsPage() {
                     ) : (
                         <div className="overflow-x-auto">
 
-                            <table className="w-full min-w-[600px]">
+                            <table className="w-full min-w-[800px]">
 
                                 <thead>
                                     <tr className="border-b border-gray-800 bg-[#151b24] text-left">
@@ -758,6 +793,10 @@ export default function PredictionsPage() {
 
                                         <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
                                             Crowd Level
+                                        </th>
+
+                                        <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                            Future Risk
                                         </th>
 
                                     </tr>
@@ -798,6 +837,30 @@ export default function PredictionsPage() {
                                                             prediction.crowd_level
                                                         }
                                                     </span>
+
+                                                </td>
+
+                                                <td className="px-5 py-4">
+
+                                                    <div className="flex items-center gap-3">
+
+                                                        <span className="text-sm font-semibold text-white">
+                                                            {prediction.future_risk_score.toFixed(
+                                                                1
+                                                            )}
+                                                        </span>
+
+                                                        <span
+                                                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadge(
+                                                                prediction.future_risk_level
+                                                            )}`}
+                                                        >
+                                                            {
+                                                                prediction.future_risk_level
+                                                            }
+                                                        </span>
+
+                                                    </div>
 
                                                 </td>
 

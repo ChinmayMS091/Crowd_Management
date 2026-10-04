@@ -42,7 +42,7 @@ export default function RootLayout({
                 href="/"
                 className="text-xl font-bold text-white hover:text-blue-400 transition-colors"
               >
-                CrowdSentinel AI
+                CrowdManagement AI
               </Link>
 
               {/* Navigation */}
@@ -60,6 +60,13 @@ export default function RootLayout({
                   className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
                 >
                   Live CCTV
+                </Link>
+
+                <Link
+                  href="/predictions"
+                  className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  Prediction
                 </Link>
 
               </div>

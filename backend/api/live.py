@@ -40,7 +40,8 @@ live_task = None
 
 async def run_live_stream(
     source: str,
-    camera_id: str
+    camera_id: str,
+    sensor_id: int
 ):
     """
     Continuously consume the live stream.
@@ -51,6 +52,7 @@ async def run_live_stream(
         async for result in live_processor.process_stream(
             source=source,
             camera_id=camera_id,
+            sensor_id=sensor_id,
             detection_interval=5
         ):
 
@@ -158,7 +160,8 @@ async def live_video_stream():
 @router.post("/start")
 async def start_live_camera(
     source: str = "0",
-    camera_id: str = "camera_1"
+    camera_id: str = "camera_1",
+    sensor_id: int = 1
 ):
     """
     Start live CCTV processing in the background.
@@ -177,13 +180,15 @@ async def start_live_camera(
     live_task = asyncio.create_task(
         run_live_stream(
             source=source,
-            camera_id=camera_id
+            camera_id=camera_id,
+            sensor_id=sensor_id
         )
     )
 
     return {
         "status": "started",
         "camera_id": camera_id,
+        "sensor_id": sensor_id,
         "source": source,
         "message": "Live camera processing started"
     }
