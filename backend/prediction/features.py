@@ -40,39 +40,92 @@ def create_features(df):
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    # Create time-based features.
+    # ---------------------------------------------------------
+    # Calendar features
+    # ---------------------------------------------------------
+
     df["hour"] = df["timestamp"].dt.hour
     df["day_of_week"] = df["timestamp"].dt.dayofweek
     df["day_of_month"] = df["timestamp"].dt.day
     df["month"] = df["timestamp"].dt.month
 
-    # Calculate lag and rolling features separately
-    # for every sensor.
+    # ---------------------------------------------------------
+    # Historical lag features
+    # ---------------------------------------------------------
+
     grouped = df.groupby("sensor_id", group_keys=False)
 
     df["lag_1"] = grouped["people_count"].shift(1)
     df["lag_2"] = grouped["people_count"].shift(2)
     df["lag_3"] = grouped["people_count"].shift(3)
+
     df["lag_24"] = grouped["people_count"].shift(24)
     df["lag_168"] = grouped["people_count"].shift(168)
 
+    # ---------------------------------------------------------
+    # Crowd momentum / change features
+    # ---------------------------------------------------------
+
+    # Change from previous hour
+    df["change_1h"] = (
+        df["lag_1"] - df["lag_2"]
+    )
+
+    # Change compared with the same time yesterday
+    df["change_24h"] = (
+        df["lag_24"]
+        - grouped["people_count"].shift(25)
+    )
+
+    # Change compared with the same time last week
+    df["change_168h"] = (
+        df["lag_168"]
+        - grouped["people_count"].shift(169)
+    )
+
+    # ---------------------------------------------------------
+    # Rolling historical averages
+    # ---------------------------------------------------------
+
     df["rolling_3"] = (
         grouped["people_count"]
-        .transform(lambda x: x.shift(1).rolling(3).mean())
+        .transform(
+            lambda x:
+            x.shift(1)
+            .rolling(3)
+            .mean()
+        )
     )
 
     df["rolling_24"] = (
         grouped["people_count"]
-        .transform(lambda x: x.shift(1).rolling(24).mean())
+        .transform(
+            lambda x:
+            x.shift(1)
+            .rolling(24)
+            .mean()
+        )
     )
 
     df["rolling_168"] = (
         grouped["people_count"]
-        .transform(lambda x: x.shift(1).rolling(168).mean())
+        .transform(
+            lambda x:
+            x.shift(1)
+            .rolling(168)
+            .mean()
+        )
     )
 
-    # Remove rows that don't have enough historical data.
-    df = df.dropna().reset_index(drop=True)
+    # ---------------------------------------------------------
+    # Remove rows without sufficient history
+    # ---------------------------------------------------------
+
+    df = (
+        df
+        .dropna()
+        .reset_index(drop=True)
+    )
 
     return df
 

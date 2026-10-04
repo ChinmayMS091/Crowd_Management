@@ -20,11 +20,13 @@ FEATURE_COLUMNS = [
     "lag_3",
     "lag_24",
     "lag_168",
+    "change_1h",
+    "change_24h",
+    "change_168h",
     "rolling_3",
     "rolling_24",
-    "rolling_168",
+    "rolling_168"
 ]
-
 TARGET_COLUMN = "people_count"
 
 
