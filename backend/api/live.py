@@ -2,7 +2,7 @@
 Live CCTV API
 
 API endpoints for starting, stopping, monitoring,
-and streaming the live CCTV processing pipeline.
+and streaming multiple live CCTV processing pipelines.
 """
 
 import asyncio
@@ -21,17 +21,46 @@ router = APIRouter(
 )
 
 
+# ---------------------------------------------------------
+# Live processors
+# ---------------------------------------------------------
+# Each camera gets its own LiveProcessor instance.
+#
+# This gives every camera its own:
+# - tracker
+# - camera state
+# - latest frame
+# - analytics state
+# - risk state
+# - unique track IDs
+#
+# The YOLO detector itself remains shared.
+# ---------------------------------------------------------
+
+live_processors = {}
+
+# Background task for each camera
+live_tasks = {}
+
 
 # ---------------------------------------------------------
-# Live processor
+# Get or create processor
 # ---------------------------------------------------------
 
-live_processor = LiveProcessor(
-    detector=shared_detector
-)
+def get_live_processor(camera_id: str) -> LiveProcessor:
+    """
+    Get the LiveProcessor for a camera.
 
-# Background task for continuous stream processing
-live_task = None
+    If the camera does not have a processor yet,
+    create one using the shared YOLO detector.
+    """
+
+    if camera_id not in live_processors:
+        live_processors[camera_id] = LiveProcessor(
+            detector=shared_detector
+        )
+
+    return live_processors[camera_id]
 
 
 # ---------------------------------------------------------
@@ -44,12 +73,14 @@ async def run_live_stream(
     sensor_id: int
 ):
     """
-    Continuously consume the live stream.
+    Continuously consume the live stream for one camera.
     """
+
+    processor = get_live_processor(camera_id)
 
     try:
 
-        async for result in live_processor.process_stream(
+        async for result in processor.process_stream(
             source=source,
             camera_id=camera_id,
             sensor_id=sensor_id,
@@ -61,37 +92,46 @@ async def run_live_stream(
             # Tracking
             # Crowd analytics
             # Risk analysis
+            # Crowd history saving
 
             # Keep processing the stream.
             pass
 
     except asyncio.CancelledError:
 
-        live_processor.stop()
+        processor.stop()
 
         raise
 
     except Exception as e:
 
-        print(f"Live stream error: {e}")
+        print(
+            f"Live stream error for camera "
+            f"{camera_id}: {e}"
+        )
 
-        live_processor.stop()
+        processor.stop()
+
+    finally:
+
+        live_tasks.pop(camera_id, None)
 
 
 # ---------------------------------------------------------
 # MJPEG video stream generator
 # ---------------------------------------------------------
 
-async def generate_mjpeg_stream():
+async def generate_mjpeg_stream(camera_id: str):
     """
-    Generate MJPEG frames from the currently running
-    LiveProcessor camera stream.
+    Generate MJPEG frames for a specific camera.
     """
 
-    while live_processor.running:
+    processor = get_live_processor(camera_id)
+
+    while processor.running:
 
         # Get latest camera frame
-        frame = live_processor.latest_frame
+        frame = processor.latest_frame
 
         if frame is None:
 
@@ -131,25 +171,37 @@ async def generate_mjpeg_stream():
 @router.get("/status")
 async def get_live_status():
     """
-    Get current live CCTV processor status.
+    Get current status of all live CCTV cameras.
     """
 
-    return live_processor.get_status()
+    cameras = {}
+
+    for camera_id, processor in live_processors.items():
+
+        cameras[camera_id] = processor.get_status()
+
+    return {
+        "cameras": cameras,
+        "total_cameras": len(cameras)
+    }
 
 
 # ---------------------------------------------------------
 # Live video stream
 # ---------------------------------------------------------
 
-@router.get("/stream")
-async def live_video_stream():
+@router.get("/stream/{camera_id}")
+async def live_video_stream(camera_id: str):
     """
-    Stream the live CCTV camera feed using MJPEG.
+    Stream the live CCTV camera feed for a specific camera.
     """
 
     return StreamingResponse(
-        generate_mjpeg_stream(),
-        media_type="multipart/x-mixed-replace; boundary=frame"
+        generate_mjpeg_stream(camera_id),
+        media_type=(
+            "multipart/x-mixed-replace; "
+            "boundary=frame"
+        )
     )
 
 
@@ -164,20 +216,44 @@ async def start_live_camera(
     sensor_id: int = 1
 ):
     """
-    Start live CCTV processing in the background.
+    Start live CCTV processing for a specific camera.
     """
 
-    global live_task
+    # Get or create processor
+    processor = get_live_processor(camera_id)
 
-    if live_processor.running:
+    # Check if this camera is already running
+    if processor.running:
 
         return {
             "status": "already_running",
-            "message": "Live camera is already running"
+            "camera_id": camera_id,
+            "sensor_id": sensor_id,
+            "message": (
+                "This camera is already running"
+            )
         }
 
+    # Check if a background task already exists
+    existing_task = live_tasks.get(camera_id)
+
+    if existing_task is not None:
+
+        if not existing_task.done():
+
+            return {
+                "status": "already_running",
+                "camera_id": camera_id,
+                "sensor_id": sensor_id,
+                "message": (
+                    "This camera is already processing"
+                )
+            }
+
+        live_tasks.pop(camera_id, None)
+
     # Start background processing task
-    live_task = asyncio.create_task(
+    task = asyncio.create_task(
         run_live_stream(
             source=source,
             camera_id=camera_id,
@@ -185,12 +261,16 @@ async def start_live_camera(
         )
     )
 
+    live_tasks[camera_id] = task
+
     return {
         "status": "started",
         "camera_id": camera_id,
         "sensor_id": sensor_id,
         "source": source,
-        "message": "Live camera processing started"
+        "message": (
+            "Live camera processing started"
+        )
     }
 
 
@@ -198,23 +278,40 @@ async def start_live_camera(
 # Stop
 # ---------------------------------------------------------
 
-@router.post("/stop")
-async def stop_live_camera():
+@router.post("/stop/{camera_id}")
+async def stop_live_camera(camera_id: str):
     """
-    Stop the live CCTV processor.
+    Stop live CCTV processing for a specific camera.
     """
 
-    global live_task
+    processor = live_processors.get(camera_id)
 
-    live_processor.stop()
+    if processor is None:
 
-    if live_task is not None:
+        return {
+            "status": "not_found",
+            "camera_id": camera_id,
+            "message": (
+                "Camera does not have an active processor"
+            )
+        }
 
-        live_task.cancel()
+    # Stop the processor
+    processor.stop()
 
-        live_task = None
+    # Cancel background task
+    task = live_tasks.get(camera_id)
+
+    if task is not None:
+
+        if not task.done():
+
+            task.cancel()
+
+        live_tasks.pop(camera_id, None)
 
     return {
         "status": "stopped",
+        "camera_id": camera_id,
         "message": "Live camera stopped"
     }

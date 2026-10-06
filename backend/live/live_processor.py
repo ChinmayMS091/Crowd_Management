@@ -683,7 +683,7 @@ class LiveProcessor:
                     )
                     VALUES (
                         %s,
-                        NOW(),
+                        date_trunc('hour', NOW()),
                         %s,
                         %s
                     )
