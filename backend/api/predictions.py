@@ -5,12 +5,16 @@ from fastapi import APIRouter, Query
 import psycopg2
 
 from prediction.future_risk import calculate_future_risk
+from fastapi import Depends
+from auth_dependencies import require_roles
 
 
 router = APIRouter(
     prefix="/api/predictions",
-    tags=["Predictions"]
+    tags=["Predictions"],
+    dependencies=[Depends(require_roles("owner", "security_head"))],
 )
+
 
 
 DB_CONFIG = {

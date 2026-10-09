@@ -145,3 +145,53 @@ class FrameResult(BaseModel):
     tracks: List[Dict[str, Any]]  # Track ID, bbox, etc.
     people_count: int
     density: float
+
+class LoginRequest(BaseModel):
+    """Request body for user login."""
+
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class UserResponse(BaseModel):
+    """Public user information returned by authentication APIs."""
+
+    id: int
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class TokenResponse(BaseModel):
+    """Response returned after successful login."""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+
+from datetime import datetime
+
+
+class MessageCreate(BaseModel):
+    """Request body for sending a message."""
+    channel: str = Field(..., min_length=1, max_length=50)
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class MessageResponse(BaseModel):
+    """Message returned by the communication API."""
+    id: int
+    sender_id: int
+    channel: str
+    content: str
+    created_at: datetime
+    sender_name: str
+
+    class Config:
+        from_attributes = True

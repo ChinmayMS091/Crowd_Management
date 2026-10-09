@@ -57,7 +57,8 @@ async def init_db():
         Analysis,
         Zone,
         Alert,
-        AnalysisMetric
+        AnalysisMetric,
+        User
     )
 
     async with engine.begin() as conn:

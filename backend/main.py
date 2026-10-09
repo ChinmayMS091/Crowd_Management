@@ -2,6 +2,10 @@
 Crowd Management AI Backend
 FastAPI server for video processing and AI analysis
 """
+from fastapi import Depends
+from auth_dependencies import get_current_user, require_roles
+from api.communication import router as communication_router
+from models import User
 from api.live import router as live_router
 from api.predictions import router as predictions_router    
 from fastapi import FastAPI
@@ -12,6 +16,7 @@ import logging
 
 from api.videos import router as videos_router
 from api.analysis import router as analysis_router
+from api.auth import router as auth_router
 from ai.shared_detector import shared_detector
 from database import init_db
 
@@ -61,7 +66,8 @@ app.include_router(predictions_router)
 app.include_router(live_router)
 app.include_router(videos_router)
 app.include_router(analysis_router)
-
+app.include_router(auth_router) 
+app.include_router(communication_router)
 
 @app.get("/")
 async def root():
@@ -88,6 +94,20 @@ async def health():
         }
     }
 
+
+@app.get("/api/auth/me")
+async def get_my_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the authenticated user's profile."""
+
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+    }
 
 if __name__ == "__main__":
     import uvicorn

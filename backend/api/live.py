@@ -8,6 +8,9 @@ and streaming multiple live CCTV processing pipelines.
 import asyncio
 import cv2
 
+from fastapi import Depends
+from auth_dependencies import require_roles
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
@@ -15,10 +18,13 @@ from live.live_processor import LiveProcessor
 from ai.shared_detector import shared_detector
 
 
+
 router = APIRouter(
     prefix="/api/live",
-    tags=["live"]
+    tags=["live"],
+    dependencies=[Depends(require_roles("owner", "security_head"))],
 )
+
 
 
 # ---------------------------------------------------------

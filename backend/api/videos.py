@@ -1,7 +1,7 @@
 """
 Video upload and management API routes
 """
-
+from auth_dependencies import require_roles
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,11 @@ from models import Video
 from schemas import VideoUploadResponse, VideoStatusResponse
 from config import settings
 
-router = APIRouter(prefix="/api/videos", tags=["videos"])
+router = APIRouter(
+    prefix="/api/videos",
+    tags=["videos"],
+    dependencies=[Depends(require_roles("owner", "security_head"))],
+)
 
 
 async def validate_video_file(file: UploadFile) -> None:

@@ -1,7 +1,7 @@
 """
 Analysis API routes
 """
-
+from auth_dependencies import require_roles
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -52,10 +52,13 @@ logger = logging.getLogger(__name__)
 # ROUTER
 # =============================================================
 
+
 router = APIRouter(
     prefix="/api/analysis",
-    tags=["analysis"]
+    tags=["analysis"],
+    dependencies=[Depends(require_roles("owner", "security_head"))],
 )
+
 
 
 # =============================================================

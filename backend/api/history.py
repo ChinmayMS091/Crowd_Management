@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Query
 from datetime import date
 import psycopg2
+from fastapi import APIRouter, Query, Depends
+from auth_dependencies import require_roles
+
 
 router = APIRouter(
     prefix="/api/history",
-    tags=["Historical Data"]
+    tags=["Historical Data"],
+    dependencies=[Depends(require_roles("owner", "security_head"))],
 )
+
 
 DB_CONFIG = {
     "host": "localhost",
