@@ -80,9 +80,29 @@ export default function LoginPage() {
                 return;
             }
 
+
             // Store authentication details after successful login.
             localStorage.setItem('access_token', auth.access_token);
             localStorage.setItem('user', JSON.stringify(auth.user));
+
+            // Set a short-lived cookie for the authenticated video stream proxy.
+            if (["owner", "security_head"].includes(auth.user.role)) {
+                const cookieResponse = await fetch('/api/live/stream/webcam', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${auth.access_token}`,
+                    },
+                });
+
+                if (!cookieResponse.ok) {
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('user');
+                    setError('Unable to initialize the video stream. Please try again.');
+                    return;
+                }
+            }
+
+
 
             // Redirect according to the authenticated user's role.
             switch (auth.user.role) {

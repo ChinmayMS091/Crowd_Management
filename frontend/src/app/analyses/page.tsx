@@ -27,29 +27,59 @@ export default function AnalysesPage() {
     fetchAnalyses();
   }, []);
 
+
   const fetchAnalyses = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/analysis/');
+      setError('');
+
+      const token = localStorage.getItem('access_token');
+
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('http://localhost:8000/api/analysis/', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
         setAnalyses(data);
+      } else if (response.status === 401 || response.status === 403) {
+        setError('You are not authorized to view analyses.');
       } else {
         setError('Failed to fetch analyses');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to connect to backend');
     } finally {
       setLoading(false);
     }
   };
 
+
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this analysis?')) return;
 
     try {
+
+      const token = localStorage.getItem('access_token');
+
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const response = await fetch(`http://localhost:8000/api/analysis/${id}`, {
         method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
 
       if (response.ok) {
         // Refresh the list after successful deletion

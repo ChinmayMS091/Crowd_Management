@@ -66,13 +66,24 @@ export default function Home() {
 
           // Start analysis
           try {
+
+            const token = localStorage.getItem('access_token');
+
+            if (!token) {
+              setUploadStatus('error');
+              setUploadMessage('Authentication required. Please log in again.');
+              return;
+            }
+
             const analysisResponse = await fetch('http://localhost:8000/api/analysis/start', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify({ video_id: data.id }),
             });
+
 
             if (analysisResponse.ok) {
               const analysisData = await analysisResponse.json();
@@ -106,8 +117,19 @@ export default function Home() {
         setUploadMessage('Upload cancelled');
       });
 
+
+      const token = localStorage.getItem('access_token');
+
+      if (!token) {
+        setUploadStatus('error');
+        setUploadMessage('Authentication required. Please log in again.');
+        return;
+      }
+
       xhr.open('POST', 'http://localhost:8000/api/videos/upload');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
+
 
     } catch (error) {
       setUploadStatus('error');
@@ -118,36 +140,76 @@ export default function Home() {
   const pollAnalysisProgress = async (id: number) => {
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/analysis/${id}`);
-        if (response.ok) {
-          const data = await response.json();
+        const token = localStorage.getItem('access_token');
 
-          if (data.total_frames && data.frames_processed) {
-            const progress = (data.frames_processed / data.total_frames) * 100;
-            setProcessingProgress(progress);
-            setUploadMessage(`Processing... ${progress.toFixed(0)}%`);
-          }
+        if (!token) {
+          clearInterval(pollInterval);
+          setUploadStatus('error');
+          setUploadMessage('Authentication required. Please log in again.');
+          return;
+        }
 
-          if (data.status === 'completed') {
-            clearInterval(pollInterval);
-            setUploadStatus('success');
-            setUploadMessage('Analysis complete! Redirecting...');
-            setTimeout(() => {
-              window.location.href = `/analyses/${id}`;
-            }, 1000);
-          } else if (data.status === 'failed') {
-            clearInterval(pollInterval);
-            setUploadStatus('error');
-            setUploadMessage(`Analysis failed: ${data.error_message || 'Unknown error'}`);
+        const response = await fetch(
+          `http://localhost:8000/api/analysis/${id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: 'no-store',
           }
+        );
+
+        if (response.status === 401 || response.status === 403) {
+          clearInterval(pollInterval);
+          setUploadStatus('error');
+          setUploadMessage('Authentication failed. Please log in again.');
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Status check failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.total_frames > 0 && data.frames_processed != null) {
+          const progress = Math.min(
+            100,
+            Math.round((data.frames_processed / data.total_frames) * 100)
+          );
+
+          setProcessingProgress(progress);
+          setUploadMessage(`Analyzing video... ${progress}%`);
+        } else {
+          setUploadMessage('Analyzing video... Please wait.');
+        }
+
+        if (data.status === 'completed') {
+          clearInterval(pollInterval);
+          setProcessingProgress(100);
+          setUploadStatus('success');
+          setUploadMessage('Analysis complete! Redirecting...');
+
+          window.location.href = `/analyses/${id}`;
+        } else if (data.status === 'failed') {
+          clearInterval(pollInterval);
+          setUploadStatus('error');
+          setUploadMessage(
+            `Analysis failed: ${data.error_message || 'Unknown error'}`
+          );
         }
       } catch (error) {
         clearInterval(pollInterval);
         setUploadStatus('error');
-        setUploadMessage('Failed to check analysis status');
+        setUploadMessage(
+          error instanceof Error
+            ? error.message
+            : 'Failed to check analysis status'
+        );
       }
     }, 2000);
   };
+
 
   const handleRetry = () => {
     setUploadStatus('idle');
@@ -254,13 +316,29 @@ export default function Home() {
                           {uploadStatus === 'uploading' ? 'Upload Progress' : 'Processing Progress'}
                         </span>
                         <span className="text-slate-300 text-sm">
-                          {uploadStatus === 'uploading' ? uploadProgress.toFixed(0) : processingProgress.toFixed(0)}%
+                          {uploadStatus === 'uploading'
+                            ? `${uploadProgress.toFixed(0)}%`
+                            : processingProgress > 0
+                              ? `${processingProgress}%`
+                              : 'Analyzing...'}
                         </span>
                       </div>
                       <div className="w-full bg-slate-600 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all duration-300 ${getProgressColor()}`}
-                          style={{ width: `${uploadStatus === 'uploading' ? uploadProgress : processingProgress}%` }}
+                          className={`h-2 rounded-full transition-all duration-300 ${getProgressColor()} ${uploadStatus === 'processing' && processingProgress === 0
+                            ? 'animate-pulse'
+                            : ''
+                            }`}
+                          style={{
+                            width: `${uploadStatus === 'uploading'
+                              ? uploadProgress
+                              : processingProgress > 0
+                                ? processingProgress
+                                : uploadStatus === 'processing'
+                                  ? 35
+                                  : 0
+                              }%`,
+                          }}
                         />
                       </div>
                     </div>

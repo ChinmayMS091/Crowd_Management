@@ -99,8 +99,19 @@ export default function CCTVPage() {
 
     const fetchLiveStatus = async () => {
         try {
+            const token = localStorage.getItem("access_token");
+
+            if (!token) {
+                throw new Error("Authentication token not found. Please log in again.");
+            }
+
             const response = await fetch(
-                "http://localhost:8000/api/live/status"
+                "http://localhost:8000/api/live/status",
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
 
             if (!response.ok) {
@@ -220,10 +231,19 @@ export default function CCTVPage() {
                 sensor_id: String(camera.sensor_id),
             });
 
+            const token = localStorage.getItem("access_token");
+
+            if (!token) {
+                throw new Error("Authentication token not found. Please log in again.");
+            }
+
             const response = await fetch(
                 `http://localhost:8000/api/live/start?${params.toString()}`,
                 {
                     method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
@@ -256,10 +276,19 @@ export default function CCTVPage() {
         try {
             setError("");
 
+            const token = localStorage.getItem("access_token");
+
+            if (!token) {
+                throw new Error("Authentication token not found. Please log in again.");
+            }
+
             const response = await fetch(
                 `http://localhost:8000/api/live/stop/${cameraId}`,
                 {
                     method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
@@ -291,15 +320,26 @@ export default function CCTVPage() {
                 sensor_id: "1",
             });
 
+            const token = localStorage.getItem("access_token");
+
+            if (!token) {
+                throw new Error("Authentication token not found. Please log in again.");
+            }
+
             const response = await fetch(
                 `http://localhost:8000/api/live/start?${params.toString()}`,
                 {
                     method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
             if (!response.ok) {
-                throw new Error("Failed to start webcam");
+                const errorDetails = await response.text();
+                console.error("Webcam start failed:", response.status, errorDetails);
+                throw new Error(`Failed to start webcam: ${response.status} - ${errorDetails}`);
             }
 
             await response.json();
@@ -323,10 +363,19 @@ export default function CCTVPage() {
         try {
             setError("");
 
+            const token = localStorage.getItem("access_token");
+
+            if (!token) {
+                throw new Error("Authentication token not found. Please log in again.");
+            }
+
             const response = await fetch(
                 "http://localhost:8000/api/live/stop/webcam",
                 {
                     method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
                 }
             );
 
@@ -497,7 +546,7 @@ export default function CCTVPage() {
                 <div className="bg-black w-full flex items-center justify-center">
                     {isOnline ? (
                         <img
-                            src={`http://localhost:8000/api/live/stream/${camera.camera_id}`}
+                            src={`/api/live/stream/${encodeURIComponent(camera.camera_id)}`}
                             alt={`${camera.camera_id} live feed`}
                             className="w-full h-auto max-h-[700px] object-contain"
                         />
@@ -1000,7 +1049,7 @@ export default function CCTVPage() {
                                 {webcamRunning &&
                                     webcamStatus?.connected ? (
                                     <img
-                                        src="http://localhost:8000/api/live/stream/webcam"
+                                        src="/api/live/stream/webcam"
                                         alt="Webcam live feed"
                                         className="w-full max-h-[650px] object-contain"
                                     />

@@ -63,6 +63,29 @@ interface Video {
   status: string;
 }
 
+
+const API_BASE_URL = 'http://localhost:8000';
+
+async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const token = localStorage.getItem('access_token');
+
+  if (!token) {
+    throw new Error('Authentication required. Please log in again.');
+  }
+
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+
 export default function AnalysisDetailPage({
   params
 }: {
@@ -70,8 +93,6 @@ export default function AnalysisDetailPage({
 }) {
   const resolvedParams = use(params);
   const analysisId = resolvedParams.id;
-
-  const API_BASE_URL = 'http://localhost:8000';
 
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [video, setVideo] = useState<Video | null>(null);
@@ -81,9 +102,158 @@ export default function AnalysisDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+
   // =========================================================
   // FETCH ANALYSIS DATA
   // =========================================================
+
+
+  // =========================================================
+  // FETCH ANALYSIS DATA
+  // =========================================================
+
+
+  const fetchData = async () => {
+    try {
+      setError('');
+
+      const [analysisRes, metricsRes, alertsRes] = await Promise.all([
+        authenticatedFetch(`${API_BASE_URL}/api/analysis/${analysisId}`),
+        authenticatedFetch(`${API_BASE_URL}/api/analysis/${analysisId}/metrics`),
+        authenticatedFetch(`${API_BASE_URL}/api/analysis/${analysisId}/alerts`),
+      ]);
+
+      if (analysisRes.status === 401 || analysisRes.status === 403) {
+        throw new Error('You are not authorized to view this analysis. Please log in again.');
+      }
+
+      if (!analysisRes.ok) {
+        throw new Error(`Failed to load analysis (${analysisRes.status})`);
+      }
+
+      const analysisData = await analysisRes.json();
+      setAnalysis(analysisData);
+
+
+      const videoRes = await authenticatedFetch(
+        `${API_BASE_URL}/api/videos/${analysisData.video_id}`
+      );
+
+      if (!videoRes.ok) {
+        throw new Error(
+          `Failed to load video details (${videoRes.status})`
+        );
+      }
+
+      const videoData = await videoRes.json();
+      const token = localStorage.getItem("access_token");
+
+      if (!token) {
+        throw new Error("Authentication required. Please log in again.");
+      }
+
+      const streamAuthResponse = await fetch(
+        `/api/videos/${analysisData.video_id}/stream`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!streamAuthResponse.ok) {
+        throw new Error(
+          `Unable to authenticate video playback (${streamAuthResponse.status})`
+        );
+      }
+
+      setVideo(videoData);
+
+      if (!streamAuthResponse.ok) {
+        throw new Error("Unable to authenticate video playback.");
+      }
+
+      if (!videoRes.ok) {
+        throw new Error(
+          `Failed to load video details (${videoRes.status})`
+        );
+      }
+      setVideo(videoData);
+
+      if (metricsRes.ok) {
+        setMetrics(await metricsRes.json());
+      }
+
+      if (alertsRes.ok) {
+        setAlerts(await alertsRes.json());
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch analysis data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchData();
+
+    const interval = setInterval(() => {
+      if (analysis?.status === 'running' || analysis?.status === 'pending') {
+        void fetchData();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [analysisId, analysis?.status]);
+
+
+  useEffect(() => {
+    void fetchData();
+
+    const interval = setInterval(() => {
+      if (
+        analysis?.status === 'running' ||
+        analysis?.status === 'pending'
+      ) {
+        void fetchData();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [analysisId, analysis?.status]);
+
+
+  useEffect(() => {
+    void fetchData();
+
+    const interval = setInterval(() => {
+      if (
+        analysis?.status === 'running' ||
+        analysis?.status === 'pending'
+      ) {
+        void fetchData();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [analysisId, analysis?.status]);
+
+
+  useEffect(() => {
+    void fetchData();
+
+    const interval = setInterval(() => {
+      if (
+        analysis?.status === 'running' ||
+        analysis?.status === 'pending'
+      ) {
+        void fetchData();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [analysisId, analysis?.status]);
 
   useEffect(() => {
     fetchData();
@@ -100,89 +270,32 @@ export default function AnalysisDetailPage({
     return () => clearInterval(interval);
   }, [analysisId, analysis?.status]);
 
-  const fetchData = async () => {
+  // =========================================================
+  // ACKNOWLEDGE ALERT
+  // =========================================================
+
+  const handleAcknowledgeAlert = async (alertId: number) => {
     try {
-      const [
-        analysisRes,
-        metricsRes,
-        alertsRes
-      ] = await Promise.all([
-        fetch(
-          `${API_BASE_URL}/api/analysis/${analysisId}`
-        ),
-        fetch(
-          `${API_BASE_URL}/api/analysis/${analysisId}/metrics`
-        ),
-        fetch(
-          `${API_BASE_URL}/api/analysis/${analysisId}/alerts`
-        )
-      ]);
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/api/analysis/${analysisId}/alerts/${alertId}/acknowledge`,
+        { method: 'PUT' }
+      );
 
-      if (analysisRes.ok) {
-        const analysisData = await analysisRes.json();
-
-        setAnalysis(analysisData);
-
-        // Fetch video details
-        const videoRes = await fetch(
-          `${API_BASE_URL}/api/videos/${analysisData.video_id}`
-        );
-
-        if (videoRes.ok) {
-          const videoData = await videoRes.json();
-          setVideo(videoData);
-        }
+      if (!response.ok) {
+        console.error('Failed to acknowledge alert:', response.status);
+        return;
       }
 
-      if (metricsRes.ok) {
-        const metricsData = await metricsRes.json();
-        setMetrics(metricsData);
-      }
+      const alertsRes = await authenticatedFetch(
+        `${API_BASE_URL}/api/analysis/${analysisId}/alerts`
+      );
 
       if (alertsRes.ok) {
         const alertsData = await alertsRes.json();
         setAlerts(alertsData);
       }
-
     } catch (err) {
-      setError('Failed to fetch analysis data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // =========================================================
-  // ACKNOWLEDGE ALERT
-  // =========================================================
-
-  const handleAcknowledgeAlert = async (
-    alertId: number
-  ) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/analysis/${analysisId}/alerts/${alertId}/acknowledge`,
-        {
-          method: 'PUT'
-        }
-      );
-
-      if (response.ok) {
-
-        const alertsRes = await fetch(
-          `${API_BASE_URL}/api/analysis/${analysisId}/alerts`
-        );
-
-        if (alertsRes.ok) {
-          const alertsData = await alertsRes.json();
-          setAlerts(alertsData);
-        }
-      }
-
-    } catch (err) {
-      console.error(
-        'Failed to acknowledge alert:',
-        err
-      );
+      console.error('Failed to acknowledge alert:', err);
     }
   };
 
@@ -461,10 +574,9 @@ export default function AnalysisDetailPage({
 
               <video
                 controls
-                autoPlay
                 muted
                 className="w-full"
-                src={`${API_BASE_URL}/api/videos/${video.id}/stream`}
+                src={`/api/videos/${video.id}/stream`}
               >
                 Your browser does not support the video tag.
               </video>

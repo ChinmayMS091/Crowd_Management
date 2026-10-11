@@ -2,6 +2,27 @@
 
 import { useEffect, useState } from "react";
 
+const API_BASE = "http://127.0.0.1:8000";
+
+async function authenticatedFetch(
+    url: string,
+    options: RequestInit = {}
+): Promise<Response> {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+        throw new Error("Authentication token not found. Please log in again.");
+    }
+
+    return fetch(url, {
+        ...options,
+        headers: {
+            ...options.headers,
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
+
 interface Sensor {
     id: number;
     sensor_code: string;
@@ -62,8 +83,8 @@ export default function PredictionsPage() {
     useEffect(() => {
         const fetchSensors = async () => {
             try {
-                const response = await fetch(
-                    "http://127.0.0.1:8000/api/predictions/sensors"
+                const response = await authenticatedFetch(
+                    `${API_BASE}/api/predictions/sensors`
                 );
 
                 if (!response.ok) {
@@ -94,8 +115,8 @@ export default function PredictionsPage() {
     useEffect(() => {
         const fetchEvaluation = async () => {
             try {
-                const response = await fetch(
-                    "http://127.0.0.1:8000/api/predictions/evaluation"
+                const response = await authenticatedFetch(
+                    `${API_BASE}/api/predictions/evaluation`
                 );
 
                 if (!response.ok) {
@@ -125,8 +146,8 @@ export default function PredictionsPage() {
                 setError("");
                 setPredictions([]);
 
-                const response = await fetch(
-                    `http://127.0.0.1:8000/api/predictions/dates?sensor_id=${selectedSensorId}`
+                const response = await authenticatedFetch(
+                    `${API_BASE}/api/predictions/dates?sensor_id=${selectedSensorId}`
                 );
 
                 if (!response.ok) {
@@ -180,10 +201,9 @@ export default function PredictionsPage() {
             setError("");
 
             try {
-                const response = await fetch(
-                    `http://127.0.0.1:8000/api/predictions/forecast?sensor_id=${selectedSensorId}&forecast_date=${selectedDate}`
+                const response = await authenticatedFetch(
+                    `${API_BASE}/api/predictions/forecast?sensor_id=${selectedSensorId}&forecast_date=${selectedDate}`
                 );
-
                 if (!response.ok) {
                     throw new Error("Failed to fetch prediction forecast");
                 }
