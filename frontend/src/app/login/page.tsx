@@ -101,19 +101,17 @@ export default function LoginPage() {
                     return;
                 }
             }
-
-
-
             // Redirect according to the authenticated user's role.
             switch (auth.user.role) {
                 case 'owner':
                 case 'security_head':
-                    router.replace('/home');
+                    router.replace('/');
                     break;
 
                 case 'security_guard':
                     router.replace('/communication');
                     break;
+
 
                 default:
                     localStorage.removeItem('access_token');

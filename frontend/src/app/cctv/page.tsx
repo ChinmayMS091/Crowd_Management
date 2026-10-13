@@ -89,7 +89,10 @@ export default function CCTVPage() {
     // Webcam state
     // ---------------------------------------------------------
 
+    // Webcam state
+
     const [webcamRunning, setWebcamRunning] = useState(false);
+    const [webcamStreamKey, setWebcamStreamKey] = useState(0);
     const [webcamStarting, setWebcamStarting] = useState(false);
     const [webcamStatus, setWebcamStatus] = useState<CameraStatus | null>(null);
 
@@ -344,6 +347,7 @@ export default function CCTVPage() {
 
             await response.json();
 
+            setWebcamStreamKey((previous) => previous + 1);
             setWebcamRunning(true);
 
             await fetchLiveStatus();
@@ -385,7 +389,10 @@ export default function CCTVPage() {
 
             await response.json();
 
+
             setWebcamRunning(false);
+            setWebcamStatus(null);
+
 
             await fetchLiveStatus();
         } catch (err) {
@@ -1048,11 +1055,14 @@ export default function CCTVPage() {
                             <div className="bg-black min-h-[450px] flex items-center justify-center">
                                 {webcamRunning &&
                                     webcamStatus?.connected ? (
+
                                     <img
-                                        src="/api/live/stream/webcam"
+                                        key={webcamStreamKey}
+                                        src={`/api/live/stream/webcam?t=${webcamStreamKey}`}
                                         alt="Webcam live feed"
                                         className="w-full max-h-[650px] object-contain"
                                     />
+
                                 ) : (
                                     <div className="text-center py-24">
                                         <div className="text-slate-500 text-5xl mb-4">

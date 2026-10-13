@@ -3,6 +3,7 @@
 
 import { useEffect, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import LogoutButton from "@/components/LogoutButton";
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -65,13 +66,15 @@ export default function CommunicationPage() {
 
             setUser(parsed);
 
+
             if (parsed.role === 'owner') {
                 setChannel('owner_head');
             } else if (parsed.role === 'security_head') {
-                setChannel('owner_head');
+                setChannel('head_guards');
             } else {
                 setChannel('head_guards');
             }
+
         } catch {
             localStorage.removeItem('access_token');
             localStorage.removeItem('user');
@@ -128,8 +131,13 @@ export default function CommunicationPage() {
 
         void loadMessages();
 
+        const interval = setInterval(() => {
+            void loadMessages();
+        }, 3000);
+
         return () => {
             cancelled = true;
+            clearInterval(interval);
         };
     }, [user, channel, router]);
 
@@ -203,15 +211,27 @@ export default function CommunicationPage() {
     return (
         <div className="min-h-screen bg-[#050b18] px-4 py-6 text-slate-100 sm:px-8">
             <div className="mx-auto max-w-5xl">
-                <div className="mb-6">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-400">
-                        CrowdSentinel AI
-                    </p>
-                    <h1 className="mt-2 text-3xl font-bold">Communication Center</h1>
-                    <p className="mt-2 text-slate-400">
-                        Signed in as {user.full_name} · {user.role.replace('_', ' ')}
-                    </p>
+
+                <div className="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-400">
+                            CrowdManagement AI
+                        </p>
+
+                        <h1 className="mt-2 text-3xl font-bold">
+                            Communication Center
+                        </h1>
+
+                        <p className="mt-2 text-slate-400">
+                            Signed in as {user.full_name} · {user.role.replace('_', ' ')}
+                        </p>
+                    </div>
+
+                    {user.role === 'security_guard' && <LogoutButton />}
                 </div>
+
+
+
 
                 <div className="grid gap-5 md:grid-cols-[240px_1fr]">
                     <aside className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
