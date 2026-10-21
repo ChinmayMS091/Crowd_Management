@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface Analysis {
   id: number;
@@ -39,309 +40,692 @@ interface Alert {
 }
 
 export default function DashboardPage() {
-  const [liveStatus, setLiveStatus] = useState<any>(null);
   const [latestAnalysis, setLatestAnalysis] = useState<Analysis | null>(null);
   const [metrics, setMetrics] = useState<AnalysisMetric[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const fetchDashboardData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-  const fetchDashboardData = async () => {
+    setError('');
+
     try {
-      // Fetch latest completed analysis
-      const analysesRes = await fetch('http://localhost:8000/api/analysis/');
-      if (analysesRes.ok) {
-        const analyses = await analysesRes.json();
-        const completed = analyses.filter((a: Analysis) => a.status === 'completed');
-        if (completed.length > 0) {
-          const latest = completed[0];
-          setLatestAnalysis(latest);
+      const token = localStorage.getItem('access_token');
 
-          // Fetch metrics for this analysis
-          const metricsRes = await fetch(`http://localhost:8000/api/analysis/${latest.id}/metrics`);
-          if (metricsRes.ok) {
-            const metricsData = await metricsRes.json();
-            setMetrics(metricsData);
-          }
-
-          // Fetch alerts for this analysis
-          const alertsRes = await fetch(`http://localhost:8000/api/analysis/${latest.id}/alerts`);
-          if (alertsRes.ok) {
-            const alertsData = await alertsRes.json();
-            setAlerts(alertsData);
-          }
-        }
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        return;
       }
-    } catch (err) {
-      setError('Failed to fetch dashboard data');
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      const analysesResponse = await fetch(
+        'http://localhost:8000/api/analysis/',
+        { headers }
+      );
+
+      if (!analysesResponse.ok) {
+        if (
+          analysesResponse.status === 401 ||
+          analysesResponse.status === 403
+        ) {
+          setError('You are not authorized to view the dashboard.');
+        } else {
+          setError('Failed to fetch dashboard data.');
+        }
+        return;
+      }
+
+      const analysesData: Analysis[] = await analysesResponse.json();
+
+      const completedAnalyses = analysesData.filter(
+        (item) => item.status.toLowerCase() === 'completed'
+      );
+
+      if (completedAnalyses.length === 0) {
+        setLatestAnalysis(null);
+        setMetrics([]);
+        setAlerts([]);
+        return;
+      }
+
+      const latest = completedAnalyses[0];
+      setLatestAnalysis(latest);
+
+      const [metricsResponse, alertsResponse] = await Promise.all([
+        fetch(
+          `http://localhost:8000/api/analysis/${latest.id}/metrics`,
+          { headers }
+        ),
+        fetch(
+          `http://localhost:8000/api/analysis/${latest.id}/alerts`,
+          { headers }
+        ),
+      ]);
+
+      if (metricsResponse.ok) {
+        const metricsData: AnalysisMetric[] = await metricsResponse.json();
+        setMetrics(Array.isArray(metricsData) ? metricsData : []);
+      } else {
+        setMetrics([]);
+      }
+
+      if (alertsResponse.ok) {
+        const alertsData: Alert[] = await alertsResponse.json();
+        setAlerts(Array.isArray(alertsData) ? alertsData : []);
+      } else {
+        setAlerts([]);
+      }
+    } catch {
+      setError('Failed to connect to the backend. Check that the server is running.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  const formatNumber = (
+    value: number | null | undefined,
+    digits = 1
+  ) => value == null ? '—' : value.toFixed(digits);
+
+  const formatDate = (value: string | null) => {
+    if (!value) return 'Not available';
+
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime())
+      ? 'Not available'
+      : date.toLocaleString();
+  };
+
+  const getRiskLabel = (score: number | null) => {
+    if (score == null) return 'Unavailable';
+    if (score >= 76) return 'Critical';
+    if (score >= 56) return 'High';
+    if (score >= 31) return 'Warning';
+    return 'Safe';
+  };
+
+  const getRiskText = (score: number | null) => {
+    if (score == null) return 'text-slate-400';
+    if (score >= 76) return 'text-red-600';
+    if (score >= 56) return 'text-orange-600';
+    if (score >= 31) return 'text-amber-600';
+    return 'text-emerald-600';
+  };
+
+  const getRiskDot = (score: number | null) => {
+    if (score == null) return 'bg-slate-300';
+    if (score >= 76) return 'bg-red-500';
+    if (score >= 56) return 'bg-orange-500';
+    if (score >= 31) return 'bg-amber-500';
+    return 'bg-emerald-500';
+  };
+
+  const getRiskBar = (score: number) => {
+    if (score >= 76) return 'bg-red-500';
+    if (score >= 56) return 'bg-orange-500';
+    if (score >= 31) return 'bg-amber-500';
+    return 'bg-emerald-500';
+  };
+
+  const getAlertStyle = (severity: string) => {
+    switch (severity.toLowerCase()) {
+      case 'critical':
+        return 'border-red-200 bg-red-50 text-red-800';
+      case 'high':
+        return 'border-orange-200 bg-orange-50 text-orange-800';
+      case 'warning':
+        return 'border-amber-200 bg-amber-50 text-amber-800';
+      default:
+        return 'border-slate-200 bg-slate-50 text-slate-700';
     }
   };
 
-  const getRiskLevelColor = (riskScore: number | null) => {
-    if (riskScore === null) return 'text-gray-400';
-    if (riskScore >= 76) return 'text-red-400';
-    if (riskScore >= 56) return 'text-orange-400';
-    if (riskScore >= 31) return 'text-yellow-400';
-    return 'text-green-400';
-  };
+  const recentMetrics = metrics.slice(-50);
 
-  const getRiskLevelBg = (riskScore: number | null) => {
-    if (riskScore === null) return 'bg-gray-600';
-    if (riskScore >= 76) return 'bg-red-600';
-    if (riskScore >= 56) return 'bg-orange-600';
-    if (riskScore >= 31) return 'bg-yellow-600';
-    return 'bg-green-600';
-  };
+  const maxPeople = Math.max(
+    1,
+    ...recentMetrics.map((metric) => metric.people_count)
+  );
 
-  const getAlertSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'bg-red-900/30 border-red-700 text-red-400';
-      case 'high': return 'bg-orange-900/30 border-orange-700 text-orange-400';
-      case 'warning': return 'bg-yellow-900/30 border-yellow-700 text-yellow-400';
-      default: return 'bg-slate-700/30 border-slate-600 text-slate-400';
-    }
-  };
+  const completedProgress =
+    latestAnalysis?.total_frames != null &&
+      latestAnalysis.total_frames > 0
+      ? Math.min(
+        100,
+        Math.max(
+          0,
+          (latestAnalysis.frames_processed / latestAnalysis.total_frames) *
+          100
+        )
+      )
+      : null;
+
+  const metricCards = latestAnalysis
+    ? [
+      {
+        label: 'Maximum people',
+        value: latestAnalysis.max_people_count ?? '—',
+        subtext: `Average: ${formatNumber(latestAnalysis.avg_people_count)}`,
+        gradient: 'from-blue-500 to-indigo-500',
+        icon: 'people',
+      },
+      {
+        label: 'Maximum density',
+        value: formatNumber(latestAnalysis.max_density, 3),
+        subtext: `Average: ${formatNumber(latestAnalysis.avg_density, 3)}`,
+        gradient: 'from-violet-500 to-purple-500',
+        icon: 'density',
+      },
+      {
+        label: 'Average flow rate',
+        value: formatNumber(latestAnalysis.avg_flow_rate, 3),
+        subtext: 'People moving per frame',
+        gradient: 'from-emerald-500 to-teal-500',
+        icon: 'flow',
+      },
+      {
+        label: 'Maximum risk score',
+        value: formatNumber(latestAnalysis.max_risk_score),
+        subtext: 'Scale: 0–100',
+        gradient: 'from-orange-500 to-red-500',
+        icon: 'risk',
+      },
+    ]
+    : [];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-slate-400">Loading dashboard...</div>
-      </div>
+      <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-slate-50 px-4">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+          <p className="mt-4 text-sm font-semibold text-slate-700">
+            Loading dashboard...
+          </p>
+          <p className="mt-1 text-sm text-slate-400">
+            Retrieving your latest analysis
+          </p>
+        </div>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-red-400">{error}</div>
-      </div>
+      <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-slate-50 px-4 py-10">
+        <div
+          role="alert"
+          className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-7 shadow-sm"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-xl font-bold text-red-600">
+            !
+          </div>
+          <h1 className="mt-4 text-xl font-bold text-slate-900">
+            Unable to load dashboard
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{error}</p>
+          <button
+            onClick={() => void fetchDashboardData()}
+            className="mt-5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            Try again
+          </button>
+        </div>
+      </main>
     );
   }
 
   if (!latestAnalysis) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-slate-400">No completed analyses found. Upload a video to get started.</div>
-      </div>
+      <main className="relative flex min-h-[calc(100dvh-4rem)] items-center justify-center overflow-hidden bg-slate-50 px-4 py-10">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-violet-200/30 blur-3xl"
+        />
+        <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-12">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-violet-50 text-blue-700">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              className="h-8 w-8"
+              aria-hidden="true"
+            >
+              <rect x="3" y="4" width="18" height="16" rx="3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7 9h10M7 13h6M7 17h3"
+              />
+            </svg>
+          </div>
+
+          <h1 className="mt-5 text-2xl font-bold text-slate-900">
+            Your dashboard is ready
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            No completed video analyses were found. Process a video to see
+            crowd metrics, risk trends, and generated alerts here.
+          </p>
+
+          <button
+            onClick={() => window.location.assign('/videoprocessing')}
+            className="mt-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200/60 transition hover:from-blue-700 hover:to-indigo-700"
+          >
+            Process a video
+          </button>
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+    <main className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div className="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-violet-200/30 blur-3xl" />
+        <div className="absolute -left-40 top-72 h-96 w-96 rounded-full bg-blue-200/30 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <header className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-white mb-2">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                VIDEO ANALYTICS
+              </div>
+
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
                 Crowd Analytics Dashboard
               </h1>
-              <p className="text-slate-300">
-                Analysis #{latestAnalysis.id} • Completed at {latestAnalysis.completed_at ? new Date(latestAnalysis.completed_at).toLocaleString() : 'N/A'}
+
+              <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base">
+                Insights from your latest completed video analysis.
+              </p>
+
+              <p className="mt-2 text-sm text-slate-400">
+                Analysis #{latestAnalysis.id} · Completed{' '}
+                {formatDate(latestAnalysis.completed_at)}
               </p>
             </div>
-            <button
-              onClick={() => window.location.href = '/'}
-              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              Upload New Video
-            </button>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => void fetchDashboardData(true)}
+                disabled={refreshing}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:opacity-60"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M20 7v5h-5M4 17v-5h5"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5.5 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.5-3"
+                  />
+                </svg>
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+
+              <button
+                onClick={() =>
+                  window.location.assign('/videoprocessing')
+                }
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200/60 transition hover:from-blue-700 hover:to-indigo-700"
+              >
+                + Process new video
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Metric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* People Count */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-slate-400 text-sm">Max People</div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            </div>
-            <div className="text-4xl font-bold text-white mb-1">
-              {latestAnalysis.max_people_count ?? '-'}
-            </div>
-            <div className="text-slate-500 text-sm">
-              Avg: {latestAnalysis.avg_people_count?.toFixed(1) ?? '-'}
-            </div>
-          </div>
-
-          {/* Density */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-slate-400 text-sm">Max Density</div>
-              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-            </div>
-            <div className="text-4xl font-bold text-white mb-1">
-              {latestAnalysis.max_density ? latestAnalysis.max_density.toFixed(3) : '-'}
-            </div>
-            <div className="text-slate-500 text-sm">
-              Avg: {latestAnalysis.avg_density?.toFixed(3) ?? '-'}
-            </div>
-          </div>
-
-          {/* Flow Rate */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-slate-400 text-sm">Avg Flow Rate</div>
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            </div>
-            <div className="text-4xl font-bold text-white mb-1">
-              {latestAnalysis.avg_flow_rate ? latestAnalysis.avg_flow_rate.toFixed(3) : '-'}
-            </div>
-            <div className="text-slate-500 text-sm">
-              People moving per frame
-            </div>
-          </div>
-
-          {/* Risk Score */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-slate-400 text-sm">Max Risk Score</div>
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            </div>
-            <div className="text-4xl font-bold text-white mb-1">
-              {latestAnalysis.max_risk_score ? latestAnalysis.max_risk_score.toFixed(1) : '-'}
-            </div>
-            <div className="text-slate-500 text-sm">
-              Scale: 0-100
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* People Count Trend */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <h3 className="text-lg font-semibold text-white mb-4">People Count Trend</h3>
-            {metrics.length > 0 ? (
-              <div className="h-48 flex items-end gap-1">
-                {metrics.slice(-50).map((metric) => {
-                  const maxCount = Math.max(...metrics.map(m => m.people_count), 1);
-                  const height = (metric.people_count / maxCount) * 100;
-                  return (
-                    <div
-                      key={metric.id}
-                      className="flex-1 bg-blue-600 rounded-t transition-all hover:bg-blue-500"
-                      style={{ height: `${height}%` }}
-                      title={`Frame ${metric.frame_number}: ${metric.people_count} people`}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-slate-400">
-                No metrics available
-              </div>
-            )}
-          </div>
-
-          {/* Risk Score Trend */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <h3 className="text-lg font-semibold text-white mb-4">Risk Score Trend</h3>
-            {metrics.length > 0 ? (
-              <div className="h-48 flex items-end gap-1">
-                {metrics.slice(-50).map((metric) => {
-                  const height = (metric.risk_score / 100) * 100;
-                  const color = metric.risk_score >= 76 ? 'bg-red-600' :
-                    metric.risk_score >= 56 ? 'bg-orange-600' :
-                      metric.risk_score >= 31 ? 'bg-yellow-600' : 'bg-green-600';
-                  return (
-                    <div
-                      key={metric.id}
-                      className={`flex-1 ${color} rounded-t transition-all hover:opacity-80`}
-                      style={{ height: `${height}%` }}
-                      title={`Frame ${metric.frame_number}: Risk ${metric.risk_score.toFixed(1)}`}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-slate-400">
-                No metrics available
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Status Indicators */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700 mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4">Current Status</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-4 h-4 rounded-full ${getRiskLevelBg(latestAnalysis.max_risk_score)}`}></div>
-              <div>
-                <div className="text-slate-400 text-sm">Overall Risk Level</div>
-                <div className={`font-semibold ${getRiskLevelColor(latestAnalysis.max_risk_score)}`}>
-                  {latestAnalysis.max_risk_score === null ? 'N/A' :
-                    latestAnalysis.max_risk_score >= 76 ? 'CRITICAL' :
-                      latestAnalysis.max_risk_score >= 56 ? 'HIGH' :
-                        latestAnalysis.max_risk_score >= 31 ? 'WARNING' : 'SAFE'}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className={`w-4 h-4 rounded-full ${alerts.length > 0 ? 'bg-red-500' : 'bg-green-500'}`}></div>
-              <div>
-                <div className="text-slate-400 text-sm">Alerts Generated</div>
-                <div className={`font-semibold ${alerts.length > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                  {alerts.length} alerts
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-              <div>
-                <div className="text-slate-400 text-sm">Frames Processed</div>
-                <div className="font-semibold text-blue-400">
-                  {latestAnalysis.frames_processed} / {latestAnalysis.total_frames ?? '?'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Alerts */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Recent Alerts</h3>
-            <button
-              onClick={() => window.location.href = `/analyses/${latestAnalysis.id}`}
-              className="text-sm text-slate-400 hover:text-white transition-colors"
+        <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {metricCards.map((card) => (
+            <div
+              key={card.label}
+              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              View All Alerts →
+              <div className={`h-1 bg-gradient-to-r ${card.gradient}`} />
+
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-slate-500">
+                    {card.label}
+                  </p>
+
+                  <div className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${card.gradient}`} />
+                </div>
+
+                <p
+                  className={`mt-4 break-words text-3xl font-bold tracking-tight ${card.icon === 'risk'
+                      ? getRiskText(latestAnalysis.max_risk_score)
+                      : 'text-slate-900'
+                    }`}
+                >
+                  {card.value}
+                </p>
+
+                <p className="mt-2 text-xs leading-5 text-slate-400">
+                  {card.subtext}
+                </p>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-900">
+                  People Count Trend
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Recent recorded frames
+                </p>
+              </div>
+              <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                People
+              </span>
+            </div>
+
+            {recentMetrics.length > 0 ? (
+              <>
+                <div
+                  className="mt-6 flex h-52 items-end gap-1 border-b border-slate-100 pb-1"
+                  aria-label="People count trend chart"
+                >
+                  {recentMetrics.map((metric) => {
+                    const height = Math.max(
+                      2,
+                      (metric.people_count / maxPeople) * 100
+                    );
+
+                    return (
+                      <div
+                        key={metric.id}
+                        className="group relative flex h-full min-w-0 flex-1 items-end"
+                        title={`Frame ${metric.frame_number}: ${metric.people_count} people`}
+                      >
+                        <div
+                          className="w-full rounded-t-sm bg-gradient-to-t from-blue-600 to-indigo-400 transition-opacity group-hover:opacity-70"
+                          style={{ height: `${height}%` }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                  <span>
+                    Frame {recentMetrics[0].frame_number}
+                  </span>
+                  <span>
+                    {recentMetrics.length} data points
+                  </span>
+                  <span>
+                    Frame {recentMetrics[recentMetrics.length - 1].frame_number}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex h-52 items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-400">
+                No people-count metrics available
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-900">
+                  Risk Score Trend
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Recorded risk scores across recent frames
+                </p>
+              </div>
+              <span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                Risk / 100
+              </span>
+            </div>
+
+            {recentMetrics.length > 0 ? (
+              <>
+                <div
+                  className="relative mt-6 flex h-52 items-end gap-1 border-b border-slate-100 pb-1"
+                  aria-label="Risk score trend chart"
+                >
+                  <div className="pointer-events-none absolute inset-x-0 top-1/4 border-t border-dashed border-slate-200" />
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-200" />
+                  <div className="pointer-events-none absolute inset-x-0 top-3/4 border-t border-dashed border-slate-200" />
+
+                  {recentMetrics.map((metric) => (
+                    <div
+                      key={metric.id}
+                      className="group relative z-10 flex h-full min-w-0 flex-1 items-end"
+                      title={`Frame ${metric.frame_number}: Risk ${metric.risk_score.toFixed(1)}`}
+                    >
+                      <div
+                        className={`w-full rounded-t-sm transition-opacity group-hover:opacity-70 ${getRiskBar(metric.risk_score)}`}
+                        style={{
+                          height: `${Math.min(
+                            100,
+                            Math.max(2, metric.risk_score)
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+                  {[
+                    { label: 'Safe', color: 'bg-emerald-500' },
+                    { label: 'Warning', color: 'bg-amber-500' },
+                    { label: 'High', color: 'bg-orange-500' },
+                    { label: 'Critical', color: 'bg-red-500' },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center gap-1.5 text-xs text-slate-500"
+                    >
+                      <span className={`h-2 w-2 rounded-full ${item.color}`} />
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex h-52 items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-400">
+                No risk metrics available
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5">
+            <h2 className="font-semibold text-slate-900">Analysis Status</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Summary of the completed analysis and its recorded alerts.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-4">
+              <span
+                className={`mt-1 h-3 w-3 shrink-0 rounded-full ${getRiskDot(latestAnalysis.max_risk_score)}`}
+              />
+              <div>
+                <p className="text-sm text-slate-500">Overall risk level</p>
+                <p
+                  className={`mt-1 font-semibold ${getRiskText(latestAnalysis.max_risk_score)}`}
+                >
+                  {getRiskLabel(latestAnalysis.max_risk_score)}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Based on maximum recorded risk
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-4">
+              <span
+                className={`mt-1 h-3 w-3 shrink-0 rounded-full ${alerts.length > 0 ? 'bg-red-500' : 'bg-emerald-500'
+                  }`}
+              />
+              <div>
+                <p className="text-sm text-slate-500">Alerts generated</p>
+                <p
+                  className={`mt-1 font-semibold ${alerts.length > 0
+                      ? 'text-red-600'
+                      : 'text-emerald-600'
+                    }`}
+                >
+                  {alerts.length} {alerts.length === 1 ? 'alert' : 'alerts'}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Associated with this analysis
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-500">Frames processed</p>
+                <p className="text-sm font-semibold text-blue-700">
+                  {completedProgress == null
+                    ? '—'
+                    : `${completedProgress.toFixed(1)}%`}
+                </p>
+              </div>
+
+              <p className="text-lg font-bold text-slate-900">
+                {latestAnalysis.frames_processed.toLocaleString()} /{' '}
+                {latestAnalysis.total_frames?.toLocaleString() ?? '—'}
+              </p>
+
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500"
+                  style={{
+                    width: `${completedProgress ?? 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
+              <h2 className="font-semibold text-slate-900">Recent Alerts</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Latest alerts recorded for this analysis.
+              </p>
+            </div>
+
+            <button
+              onClick={() =>
+                window.location.assign(`/analyses/${latestAnalysis.id}`)
+              }
+              className="w-fit text-sm font-semibold text-blue-700 transition hover:text-indigo-700"
+            >
+              View analysis details →
             </button>
           </div>
+
           {alerts.length === 0 ? (
-            <div className="text-slate-400">No alerts generated</div>
-          ) : (
-            <div className="space-y-3">
-              {alerts.slice(0, 5).map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`p-4 rounded-lg border ${getAlertSeverityColor(alert.severity)}`}
+            <div className="px-5 py-10 text-center sm:px-6">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-6 w-6"
+                  aria-hidden="true"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold uppercase">{alert.severity}</span>
-                    <span className="text-sm opacity-75">
-                      {new Date(alert.timestamp).toLocaleString()}
-                    </span>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m5 12 4 4L19 6"
+                  />
+                </svg>
+              </div>
+              <p className="mt-3 font-medium text-slate-800">
+                No alerts generated
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                No alerts are available for this analysis.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 p-4 sm:p-5">
+              {alerts.slice(0, 5).map((alert) => (
+                <article
+                  key={alert.id}
+                  className={`rounded-xl border p-4 ${getAlertStyle(alert.severity)}`}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wide">
+                        {alert.severity}
+                      </span>
+                      <span className="text-xs opacity-80">
+                        Risk score: {formatNumber(alert.risk_score)}
+                      </span>
+                    </div>
+
+                    <time className="text-xs opacity-75">
+                      {formatDate(alert.timestamp)}
+                    </time>
                   </div>
-                  <div className="text-sm mb-1">{alert.reason}</div>
-                  <div className="text-sm opacity-75">Risk Score: {alert.risk_score.toFixed(1)}</div>
-                </div>
+
+                  <p className="mt-2 text-sm leading-6">{alert.reason}</p>
+                </article>
               ))}
+
+              {alerts.length > 5 && (
+                <p className="pt-1 text-center text-xs text-slate-400">
+                  Showing 5 of {alerts.length} alerts.
+                </p>
+              )}
             </div>
           )}
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

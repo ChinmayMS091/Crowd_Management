@@ -1,4 +1,3 @@
-
 import { NextRequest } from "next/server";
 
 const BACKEND_URL = "http://localhost:8000";
@@ -10,7 +9,10 @@ export async function GET(
     const token = request.cookies.get("access_token")?.value;
 
     if (!token) {
-        return new Response("Unauthorized", { status: 401 });
+        return new Response(
+            "Unauthorized: Stream authentication cookie missing or expired. Please log in again.",
+            { status: 401 }
+        );
     }
 
     const { camera_id } = await context.params;
@@ -29,6 +31,7 @@ export async function GET(
 
         if (!upstream.ok || !upstream.body) {
             const details = await upstream.text();
+
             return new Response(details || "Stream request failed", {
                 status: upstream.status,
             });
@@ -46,6 +49,7 @@ export async function GET(
         });
     } catch (error) {
         console.error("Video stream proxy error:", error);
+
         return new Response("Unable to connect to video stream", {
             status: 502,
         });
@@ -71,7 +75,7 @@ export async function POST(
     const { camera_id } = await context.params;
 
     try {
-        // Validate the token and ensure the user has an active account.
+        // Validate the token and verify that the account is active.
         const authCheck = await fetch(`${BACKEND_URL}/api/auth/me`, {
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -100,18 +104,24 @@ export async function POST(
                 headers: {
                     "Content-Type": "application/json",
                     "Cache-Control": "no-store",
-                    "Set-Cookie": [
-                        `access_token=${token}`,
-                        `HttpOnly`,
-                        `SameSite=Strict`,
-                        `Path=/api/live/stream/${encodeURIComponent(camera_id)}`,
-                        `Max-Age=300`,
-                        ...(request.nextUrl.protocol === "https:"
-                            ? ["Secure"]
-                            : []),
-                    ].join("; "),
                 },
             }
+        );
+
+        // Share the stream cookie across camera URLs.
+        // Keep it HttpOnly so client-side JavaScript cannot read it.
+        response.headers.append(
+            "Set-Cookie",
+            [
+                `access_token=${token}`,
+                "HttpOnly",
+                "SameSite=Strict",
+                "Path=/api/live/stream",
+                "Max-Age=86400",
+                ...(request.nextUrl.protocol === "https:"
+                    ? ["Secure"]
+                    : []),
+            ].join("; ")
         );
 
         return response;
