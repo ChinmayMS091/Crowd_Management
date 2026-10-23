@@ -939,7 +939,7 @@ export default function Home() {
         </section>
 
         <footer className="py-8 text-center text-xs text-slate-400">
-          CrowdSentinel AI
+          CrowdManagement AI
           <span className="mx-2 text-slate-300">·</span>
           Crowd Management &amp; Stampede Prevention
         </footer>

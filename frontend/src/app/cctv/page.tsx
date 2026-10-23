@@ -487,8 +487,8 @@ export default function CCTVPage() {
                         <div className="flex items-center gap-3">
                             <span
                                 className={`h-3 w-3 rounded-full ${online
-                                        ? "animate-pulse bg-green-500"
-                                        : "bg-slate-300"
+                                    ? "animate-pulse bg-green-500"
+                                    : "bg-slate-300"
                                     }`}
                             />
                             <h3 className="text-lg font-semibold text-slate-900">
@@ -496,8 +496,8 @@ export default function CCTVPage() {
                             </h3>
                             <span
                                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${online
-                                        ? "bg-green-50 text-green-700"
-                                        : "bg-slate-100 text-slate-500"
+                                    ? "bg-green-50 text-green-700"
+                                    : "bg-slate-100 text-slate-500"
                                     }`}
                             >
                                 {online ? "ONLINE" : "OFFLINE"}
@@ -606,15 +606,15 @@ export default function CCTVPage() {
 
                     <div
                         className={`rounded-xl border p-4 ${bottleneck
-                                ? "border-red-200 bg-red-50"
-                                : "border-green-200 bg-green-50"
+                            ? "border-red-200 bg-red-50"
+                            : "border-green-200 bg-green-50"
                             }`}
                     >
                         <p className="text-sm text-slate-600">Bottleneck Status</p>
                         <p
                             className={`mt-2 text-xl font-bold ${bottleneck
-                                    ? "text-red-700"
-                                    : "text-green-700"
+                                ? "text-red-700"
+                                : "text-green-700"
                                 }`}
                         >
                             {bottleneck ? "DETECTED" : "NORMAL"}
@@ -660,7 +660,7 @@ export default function CCTVPage() {
                         </div>
                         <div>
                             <p className="text-sm font-semibold uppercase tracking-wider text-blue-700">
-                                CrowdSentinel AI
+                                CrowdManagement AI
                             </p>
                             <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
                                 CCTV Monitoring
@@ -674,8 +674,8 @@ export default function CCTVPage() {
                     <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
                         <span
                             className={`h-2.5 w-2.5 rounded-full ${loading
-                                    ? "animate-pulse bg-amber-400"
-                                    : "bg-green-500"
+                                ? "animate-pulse bg-amber-400"
+                                : "bg-green-500"
                                 }`}
                         />
                         <span className="text-sm font-medium text-slate-600">
@@ -704,8 +704,8 @@ export default function CCTVPage() {
                     <button
                         onClick={() => setActiveTab("live")}
                         className={`border-b-2 px-5 py-3 text-sm font-semibold transition ${activeTab === "live"
-                                ? "border-blue-600 text-blue-700"
-                                : "border-transparent text-slate-500 hover:text-slate-900"
+                            ? "border-blue-600 text-blue-700"
+                            : "border-transparent text-slate-500 hover:text-slate-900"
                             }`}
                     >
                         Live CCTV
@@ -713,8 +713,8 @@ export default function CCTVPage() {
                     <button
                         onClick={() => setActiveTab("webcam")}
                         className={`border-b-2 px-5 py-3 text-sm font-semibold transition ${activeTab === "webcam"
-                                ? "border-blue-600 text-blue-700"
-                                : "border-transparent text-slate-500 hover:text-slate-900"
+                            ? "border-blue-600 text-blue-700"
+                            : "border-transparent text-slate-500 hover:text-slate-900"
                             }`}
                     >
                         Webcam

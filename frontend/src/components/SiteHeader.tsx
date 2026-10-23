@@ -67,8 +67,16 @@ export default function SiteHeader() {
         setMenuOpen(false);
     }, [pathname]);
 
-    if (pathname === "/login" || role === "security_guard") {
+    if (pathname === "/login") {
         return null;
+    }
+
+    if (role === "security_guard") {
+        return (
+            <div className="fixed right-4 top-4 z-50">
+                <LogoutButton />
+            </div>
+        );
     }
 
     return (
@@ -78,7 +86,7 @@ export default function SiteHeader() {
                     <Link
                         href="/"
                         className="group flex shrink-0 items-center gap-3"
-                        aria-label="CrowdSentinel AI home"
+                        aria-label="CrowdManagement AI home"
                     >
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-cyan-400/20 to-blue-600/20 text-cyan-300 shadow-lg shadow-cyan-950/30 transition group-hover:border-cyan-300/40">
                             <svg
@@ -103,7 +111,7 @@ export default function SiteHeader() {
 
                         <div className="leading-tight">
                             <span className="block text-base font-bold tracking-tight text-white sm:text-lg">
-                                CrowdSentinel
+                                CrowdManagement
                                 <span className="text-cyan-400"> AI</span>
                             </span>
                             <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">

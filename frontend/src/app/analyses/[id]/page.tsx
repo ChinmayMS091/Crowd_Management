@@ -31,6 +31,9 @@ export default function AnalysisDetailsPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState('');
 
   const fetchAnalysis = useCallback(async () => {
     if (!analysisId || !/^\d+$/.test(analysisId)) {
@@ -82,6 +85,70 @@ export default function AnalysisDetailsPage() {
   useEffect(() => {
     void fetchAnalysis();
   }, [fetchAnalysis]);
+  useEffect(() => {
+    if (!analysis?.video_id) return;
+
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+
+    async function loadVideo() {
+      setVideoLoading(true);
+      setVideoError('');
+      setVideoUrl(null);
+
+      try {
+        const token = localStorage.getItem('access_token');
+
+        if (!token) {
+          throw new Error('Authentication required. Please log in again.');
+        }
+
+        const response = await fetch(
+          `http://localhost:8000/api/videos/${analysis!.video_id}/stream`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            response.status === 404
+              ? 'The original video file could not be found.'
+              : 'Unable to load the video.'
+          );
+        }
+
+        const videoBlob = await response.blob();
+        objectUrl = URL.createObjectURL(videoBlob);
+        setVideoUrl(objectUrl);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        setVideoError(
+          err instanceof Error
+            ? err.message
+            : 'Unable to load the video.'
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setVideoLoading(false);
+        }
+      }
+    }
+
+    void loadVideo();
+
+    return () => {
+      controller.abort();
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [analysis?.video_id]);
 
   const statusStyle = (status: string) => {
     switch (status.toLowerCase()) {
@@ -368,6 +435,56 @@ export default function AnalysisDetailsPage() {
               </div>
             </section>
 
+            <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Source video
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Review the original video used for this crowd analysis.
+                </p>
+                <p className="mt-2 text-xs font-medium text-slate-400">
+                  Video ID: #{analysis.video_id}
+                </p>
+              </div>
+
+              <div className="bg-slate-950 p-3 sm:p-5">
+                {videoLoading && (
+                  <div className="flex min-h-64 flex-col items-center justify-center text-white">
+                    <div className="h-9 w-9 animate-spin rounded-full border-4 border-white/20 border-t-white" />
+                    <p className="mt-4 text-sm text-slate-300">
+                      Loading video...
+                    </p>
+                  </div>
+                )}
+
+                {!videoLoading && videoError && (
+                  <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                    <p className="font-semibold text-white">
+                      Video unavailable
+                    </p>
+                    <p className="mt-2 max-w-lg text-sm text-slate-300">
+                      {videoError}
+                    </p>
+                  </div>
+                )}
+
+                {!videoLoading && !videoError && videoUrl && (
+                  <video
+                    key={videoUrl}
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="mx-auto max-h-[650px] w-full rounded-xl bg-black"
+                  >
+                    Your browser does not support HTML video playback.
+                  </video>
+                )}
+              </div>
+            </section>
+
+
             <div className="mb-5">
               <h2 className="text-lg font-bold text-slate-900">
                 Crowd analytics
@@ -392,8 +509,8 @@ export default function AnalysisDetailsPage() {
 
                     <p
                       className={`mt-3 text-3xl font-bold tracking-tight ${metric.icon === 'risk'
-                          ? riskStyle(analysis.max_risk_score)
-                          : 'text-slate-900'
+                        ? riskStyle(analysis.max_risk_score)
+                        : 'text-slate-900'
                         }`}
                     >
                       {metric.value}

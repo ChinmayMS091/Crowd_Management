@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CrowdSentinel AI",
+  title: "CrowdManagement AI",
   description:
     "AI-powered early crowd-risk monitoring and decision-support system",
 };

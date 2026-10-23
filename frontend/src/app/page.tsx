@@ -61,7 +61,7 @@ export default function HomeDashboard() {
                             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5">
                                 <span className="h-2 w-2 rounded-full bg-blue-600" />
                                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
-                                    CrowdSentinel AI
+                                    CrowdManagement AI
                                 </span>
                             </div>
 
@@ -233,7 +233,7 @@ export default function HomeDashboard() {
                 </section>
 
                 <footer className="pb-2 pt-8 text-center text-xs text-slate-400">
-                    CrowdSentinel AI
+                    CrowdManagement AI
                     <span className="mx-2 text-slate-300">•</span>
                     Crowd Management &amp; Stampede Prevention
                 </footer>

@@ -1,5 +1,5 @@
 """
-Database models for CrowdSentinel AI
+Database models for CrowdManagement AI
 """
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey, JSON

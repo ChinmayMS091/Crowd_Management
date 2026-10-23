@@ -159,7 +159,7 @@ export default function LoginPage() {
                         </p>
 
                         <h2 className="text-4xl font-bold leading-tight tracking-tight lg:text-5xl">
-                            CrowdSentinel
+                            CrowdManagement
                             <span className="mt-1 block text-blue-200">AI</span>
                         </h2>
 
@@ -214,7 +214,7 @@ export default function LoginPage() {
                             </div>
 
                             <p className="text-sm font-semibold text-blue-700">
-                                CrowdSentinel AI
+                                CrowdManagement AI
                             </p>
                         </div>
 

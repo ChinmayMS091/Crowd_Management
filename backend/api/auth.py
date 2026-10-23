@@ -1,5 +1,5 @@
 """
-Authentication API for CrowdSentinel AI.
+Authentication API for CrowdManagement AI.
 """
 
 from datetime import datetime, timedelta, timezone

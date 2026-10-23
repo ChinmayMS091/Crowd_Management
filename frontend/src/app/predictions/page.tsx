@@ -671,10 +671,10 @@ export default function PredictionsPage() {
                                             { month: "long", year: "numeric" }
                                         )}${available ? ", forecast available" : ", no forecast available"}`}
                                         className={`relative flex aspect-square flex-col items-center justify-center rounded-xl border text-sm font-semibold transition ${selected
-                                                ? "border-blue-600 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/20"
-                                                : available
-                                                    ? "border-blue-100 bg-blue-50/70 text-blue-800 hover:border-blue-300 hover:bg-blue-100"
-                                                    : "cursor-not-allowed border-transparent bg-slate-50 text-slate-300"
+                                            ? "border-blue-600 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/20"
+                                            : available
+                                                ? "border-blue-100 bg-blue-50/70 text-blue-800 hover:border-blue-300 hover:bg-blue-100"
+                                                : "cursor-not-allowed border-transparent bg-slate-50 text-slate-300"
                                             }`}
                                     >
                                         {day}
@@ -1023,7 +1023,7 @@ export default function PredictionsPage() {
                 </section>
 
                 <footer className="py-8 text-center text-xs text-slate-400">
-                    CrowdSentinel AI
+                    CrowdManagement AI
                     <span className="mx-2 text-slate-300">·</span>
                     Predictive Crowd Intelligence
                 </footer>

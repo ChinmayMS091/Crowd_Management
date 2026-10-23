@@ -1,5 +1,5 @@
 """
-Configuration settings for CrowdSentinel AI Backend
+Configuration settings for CrowdManagement AI Backend
 """
 
 from pydantic_settings import BaseSettings

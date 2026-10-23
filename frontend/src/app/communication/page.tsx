@@ -376,14 +376,14 @@ export default function CommunicationPage() {
                                         type="button"
                                         onClick={() => setChannel(item)}
                                         className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${active
-                                                ? "border-blue-200 bg-gradient-to-r from-blue-50 to-violet-50 shadow-sm"
-                                                : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                                            ? "border-blue-200 bg-gradient-to-r from-blue-50 to-violet-50 shadow-sm"
+                                            : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
                                             }`}
                                     >
                                         <div
                                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active
-                                                    ? "bg-blue-100 text-blue-700"
-                                                    : "bg-slate-100 text-slate-600"
+                                                ? "bg-blue-100 text-blue-700"
+                                                : "bg-slate-100 text-slate-600"
                                                 }`}
                                         >
                                             <svg
@@ -441,11 +441,6 @@ export default function CommunicationPage() {
                             </p>
                         </div>
 
-                        {user.role === "security_guard" && (
-                            <div className="mt-5 border-t border-slate-100 pt-5">
-                                <LogoutButton />
-                            </div>
-                        )}
                     </aside>
 
                     <section className="flex min-h-[600px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -528,8 +523,8 @@ export default function CommunicationPage() {
                                     >
                                         <div
                                             className={`max-w-[90%] rounded-2xl border px-4 py-3 shadow-sm sm:max-w-[80%] ${ownMessage
-                                                    ? "border-blue-100 bg-gradient-to-br from-blue-50 to-violet-50"
-                                                    : "border-slate-200 bg-white"
+                                                ? "border-blue-100 bg-gradient-to-br from-blue-50 to-violet-50"
+                                                : "border-slate-200 bg-white"
                                                 }`}
                                         >
                                             <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -622,7 +617,7 @@ export default function CommunicationPage() {
                 </div>
 
                 <footer className="py-8 text-center text-xs text-slate-400">
-                    CrowdSentinel AI
+                    CrowdManagement AI
                     <span className="mx-2 text-slate-300">·</span>
                     Crowd Management &amp; Stampede Prevention
                 </footer>
